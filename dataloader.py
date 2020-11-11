@@ -66,7 +66,10 @@ class DataSetDir(object):
         word2id = {}
         word2id['PAD'] = 0
         word2id['UNK'] = 1
-        embed_matrix = [[0]*dim_size,[0]*dim_size]
+        word2id['CLS'] = 2
+        word2id['SEP'] = 3
+        word2id['SPLIT'] = 4
+        embed_matrix = [[0]*dim_size,[0]*dim_size,[0]*dim_size,[0]*dim_size,[0]*dim_size]
         for idx,line in enumerate(lines[1:]):
             t = line.strip().split(' ')
             word, _ = t[0].split('||')
@@ -294,7 +297,9 @@ class Dataloader(object):
     def __iter__(self):
         ixs = list(range(0,len(self.data)))
         random.shuffle(ixs)
-        batch_old_word_set, batch_new_word_set, batch_label = [], [], []
+        batch_item,batch_token_type_ids, batch_label = [], [], []
+        SEP = self.word2id['SEP']
+        CLS = self.word2id['CLS']
         for index,ix in enumerate(ixs):
             word_set, waiting_word, label = self.data[ix]
             word_id_set = [ self.word2id[word] for word in word_set]
@@ -302,38 +307,36 @@ class Dataloader(object):
             new_word_id_set = word_id_set.copy()
             new_word_id_set.append(waiting_word_id)
             
-            batch_old_word_set.append(word_id_set)
-            batch_new_word_set.append(new_word_id_set)
+            item = [CLS,*word_id_set,SEP,*new_word_id_set,SEP]
+            L = len(word_id_set)+2
+            token_type_ids = [*([0]*L), *([1]*L)]
             batch_label.append(label)
+            batch_item.append(item)
+            batch_token_type_ids.append(token_type_ids)
 
             if (index+1) % self.batch_size == 0 or index == len(self.data) - 1:
-                (batch_old_word_set_, old_mask), (batch_new_word_set_,new_mask) = set_padding(batch_old_word_set), set_padding(batch_new_word_set)
-                # batch_label = self._trans_label(batch_label)
-                yield batch_old_word_set_, old_mask, batch_new_word_set_, new_mask, batch_label
-                batch_old_word_set, batch_new_word_set, batch_label = [],[],[]
+                batch_item_, attention_mask = set_padding(batch_item)
+                batch_token_type_ids_, _ = set_padding(batch_token_type_ids)
+                yield batch_item_, attention_mask, batch_token_type_ids_, batch_label
+                batch_item,batch_token_type_ids, batch_label = [], [], []
+
+
+def test_dataloader():
+    # import os
+    # cwd = os.getcwd()
+    # NYT = os.path.join(cwd,'data','NYT')
+    cwd = Path.cwd()
+    NYT = cwd.joinpath('data','NYT')
+    datasetdir = DataSetDir(NYT)
+    sampler = select_sampler('sample_size_repeat_size')
+    dataitemset = DataItemSet(datasetdir.train_dataset,sampler,5)
+    dataloader = Dataloader(dataitemset,datasetdir.word2id,32)
+    for i,x in enumerate(dataloader):
+        item, attention_mask ,token_type_ids, labels = x
+        import pdb;pdb.set_trace()
     
-    # Error method
-    def split(self, q:float=0.2) -> Tuple[Any]:
-        dataitem = copy(self.data)
-        ixs = list(range(0,len(self.data)))
-        random.shuffle(ixs)
-        sub_l = int(self.l * q)
-        return [
-                Dataloader(dataitem[:sub_l], self.word2id, self.batch_size),
-                Dataloader(dataitem[sub_l:], self.word2id, self.batch_size)
-            ]
-        
-
-
-
-
-
-
-
-
 
 if __name__ == '__main__':
-    pass
-    # test_dataitemset()
-    # test_dataloader()
+    test_dataloader()
+
 
