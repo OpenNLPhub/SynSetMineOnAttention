@@ -33,7 +33,7 @@ TrainingConfig ={
     'batch_size' : 32,
     'result_out_dir' : cwd.joinpath('result'),
     'cuda': 'cuda:0',
-    'bert_freeze': True
+    'bert_freeze': False
 }
 
 #default Operate Config
