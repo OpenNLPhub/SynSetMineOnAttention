@@ -52,8 +52,16 @@ class ModelWrapper(object):
         self.batch_size = trainingconfig['batch_size']
         self.optimizer = optim.Adam(filter(lambda p: p.requires_grad, self.model.parameters()), lr=self.init_lr, amsgrad=True)
         # optimizer is default 
+    def _trans_input_to_tensor(self,item:Sequence[Any]):
+        wordset, attention_mask, token_type_ids, labels = item
+        F = lambda x: torch.tensor(x).long().to(self.device)
+        wordset = F(wordset)
+        attention_mask = F(wordset)
+        token_type_ids = F(wordset)
+        tensor_labels = torch.tensor(labels).float().to(self.device)
+        return wordset, attention_mask, token_type_ids, labels, tensor_labels
 
-    def train(self, train_dataloader:Dataloader, dev_dataloader:Optional[Dataloader] = None) -> None:
+    def train(self, train_dataloader:Dataloader, dev_dataloader:Dataloader) -> None:
         """Implementation to Batch Train the model
         Args:
             train_dataloader : training dataset iteration used to train model
@@ -67,12 +75,6 @@ class ModelWrapper(object):
         all_step = len(train_dataloader)
         t = range(self.start_epoches, self.epoches)
 
-        if dev_dataloader == None:
-            '''split train_dataloader'''
-            train_dataloader_, dev_dataloader_ = train_dataloader.split()
-        else:
-            train_dataloader_ = train_dataloader
-            dev_dataloader_ = dev_dataloader
         # used to plot
         ep_loss_list = []
         val_loss_list = []
@@ -81,15 +83,14 @@ class ModelWrapper(object):
             self.model.train()
             ep_loss = 0
             summary_metrics = EvalUnit(0,0,0,0,'epoch'+str(epoch))
-            for step,item in enumerate(train_dataloader_):
-                word_set, mask, new_word_set, mask_, labels = item
-                F = lambda x: torch.Tensor(x).long().to(self.device)
-                word_set_tensor, mask, new_word_set_tensor, mask_ = [
-                    F(i) for i in [word_set, mask, new_word_set, mask_]
-                ]
-                pred_labels = self.model(word_set_tensor, mask, new_word_set_tensor, mask_)
-                #batch_size * 1 : vector
-                labels_tensor = torch.Tensor(labels).float().to(self.device)
+            for step,item in enumerate(train_dataloader):
+                # word_set, mask, new_word_set, mask_, labels = item
+                # F = lambda x: torch.Tensor(x).long().to(self.device)
+                # word_set_tensor, mask, new_word_set_tensor, mask_ = [
+                #     F(i) for i in [word_set, mask, new_word_set, mask_]
+                # ]
+                input_ids, attention_mask, token_type_ids, labels, labels_tensor = self._trans_input_to_tensor(item)
+                pred_labels = self.model(input_ids, attention_mask, token_type_ids)
                 cur_loss = self.loss_fn(pred_labels,labels_tensor) / labels_tensor.shape[0]
                 ep_loss += cur_loss.item()
                 # backward
@@ -115,7 +116,7 @@ class ModelWrapper(object):
             # writer.add_scalar('Loss/Train',)
 
             #validate
-            val_loss = self.validate(dev_dataloader_)
+            val_loss = self.validate(dev_dataloader)
 
             #save checkpoint
             if (epoch + 1 == self.start_epoches + self.checkpoint_epoches or 
@@ -145,13 +146,15 @@ class ModelWrapper(object):
         summary_metrics = EvalUnit(name='Validation')
         all_step = len(dev_dataloader)
         for step,item in enumerate(dev_dataloader):
-            word_set, mask, new_word_set, mask_, labels = item
-            F = lambda x: torch.Tensor(x).long().to(self.device)
-            word_set_tensor, mask, new_word_set_tensor, mask_ = [
-                F(i) for i in [word_set, mask, new_word_set, mask_]
-            ]
-            pred_labels = self.model(word_set_tensor, mask, new_word_set_tensor, mask_)
-            labels_tensor = torch.Tensor(labels).float().to(self.device)
+            # word_set, mask, new_word_set, mask_, labels = item
+            # F = lambda x: torch.Tensor(x).long().to(self.device)
+            # word_set_tensor, mask, new_word_set_tensor, mask_ = [
+            #     F(i) for i in [word_set, mask, new_word_set, mask_]
+            # ]
+            # pred_labels = self.model(word_set_tensor, mask, new_word_set_tensor, mask_)
+            # labels_tensor = torch.Tensor(labels).float().to(self.device)
+            input_ids, attention_mask, token_type_ids, labels, labels_tensor = self._trans_input_to_tensor(item)
+            pred_labels = self.model(input_ids, attention_mask, token_type_ids)
             cur_loss = self.loss_fn(pred_labels,labels_tensor) / labels_tensor.shape[0]
             val_loss += cur_loss.item()
             #metrics
@@ -184,12 +187,14 @@ class ModelWrapper(object):
         all_step = len(test_dataloader)
         summary_metrics = EvalUnit()
         for step,item in enumerate(test_dataloader):
-            word_set, mask, new_word_set, mask_, labels = item 
-            F = lambda x: torch.Tensor(x).long().to(self.device)
-            word_set_tensor, mask, new_word_set_tensor, mask_ = [
-                F(i) for i in [word_set, mask, new_word_set, mask_]
-            ]
-            pred_labels = self.best_model(word_set_tensor, mask, new_word_set_tensor, mask_)
+            input_ids, attention_mask, token_type_ids, labels, labels_tensor = self._trans_input_to_tensor(item)
+            pred_labels = self.best_model(input_ids, attention_mask, token_type_ids)
+            # word_set, mask, new_word_set, mask_, labels = item 
+            # F = lambda x: torch.Tensor(x).long().to(self.device)
+            # word_set_tensor, mask, new_word_set_tensor, mask_ = [
+            #     F(i) for i in [word_set, mask, new_word_set, mask_]
+            # ]
+            # pred_labels = self.best_model(word_set_tensor, mask, new_word_set_tensor, mask_)
             pred_labels = np.where(pred_labels.cpu().detach().numpy()>self.threshold, 1, 0)
             # cal metrics
             unit = binary_confusion_matrix_evaluate(np.array(labels),pred_labels)
