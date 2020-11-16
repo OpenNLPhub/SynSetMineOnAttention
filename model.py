@@ -120,7 +120,7 @@ class SynSetClassfier(nn.Module):
             input_ids=None,
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
-            input_embeds=x
+            inputs_embeds=x
             )[1]
         # (batch_size, bert_emb_dim)
 
