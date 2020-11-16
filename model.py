@@ -7,6 +7,7 @@
 
 from typing import List
 import torch
+from torch._C import set_flush_denormal
 import torch.nn as nn
 from torch.nn.modules import dropout
 from transformers import BertModel
@@ -64,7 +65,8 @@ def getPretrainedBertModel(key:str) -> BertModel:
     path = BertPretrainedModelPath[key]
     return BertModel.from_pretrained(path)
 
-def getFCLayer(state_size_list:List) -> nn.Sequential:
+
+def getFCLayer(state_size_list:List,add_dropout:bool=False,dropout:float= 0.2) -> nn.Sequential:
     in_size = state_size_list[:-1]
     out_size = state_size_list[1:]
     size_tuple = list(zip(in_size,out_size))
@@ -74,27 +76,31 @@ def getFCLayer(state_size_list:List) -> nn.Sequential:
             L.append(nn.ReLU())
         bias = True if ix == len(L) - 1 else False
         L.append(nn.Linear(i,j,bias=bias))
+        if add_dropout:
+            L.append(nn.Dropout(dropout))
     return nn.Sequential(*L)
         
 
 class SynSetClassfier(nn.Module):
     def __init__(self,component,config):
         super(SynSetClassfier,self).__init__()
+        self.name = config['name']
+        self.version = config['version']
         self.bert = component['bert']
         self.embedding = component['embedding']
         embedding_state_size_list = [
             self.embedding.word_embeddings.embedding_dim,
-            *config['embedding_hidden_size'],
+            *config['embed_trans_hidden_size'],
             self.bert.embeddings.word_embeddings.embedding_dim
             ]
         self.embedding_map = getFCLayer(embedding_state_size_list)
 
         out_state_size_list = [
             self.bert.embeddings.word_embeddings.embedding_dim,
-            *config['output_hidden_size'],
+            *config['post_trans_hidden_size'],
             1
             ]
-        self.output_map = getFCLayer(out_state_size_list)
+        self.output_map = getFCLayer(out_state_size_list,add_dropout=0.2,dropout=config['dropout'])
 
     def forward(self,input_ids,attention_mask,token_type_ids):
         """
@@ -125,7 +131,9 @@ class SynSetClassfier(nn.Module):
         return x
         # batch_size
 
-            
+    def freeze_bert_paramter(self):
+        for i in self.bert.parameters():
+            i.requires_grad = False            
             
             
 
