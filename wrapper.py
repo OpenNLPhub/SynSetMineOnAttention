@@ -75,10 +75,6 @@ class ModelWrapper(object):
         all_step = len(train_dataloader)
         t = range(self.start_epoches, self.epoches)
 
-        # used to plot
-        ep_loss_list = []
-        val_loss_list = []
-
         for epoch in t:
             self.model.train()
             ep_loss = 0
@@ -108,6 +104,7 @@ class ModelWrapper(object):
                 if (step+1) % self.print_step == 0 or step + 1 == all_step:
                     desc = 'Epoch:{} {} / {} Loss:{}'.format(epoch+1,step+1,all_step,cur_loss.item())
                     logger.info(desc)
+                # writer.add_scalar('Loss/Train Epoch{}'.format(epoch),cur_loss, step)
             #log metrics
             logger.info("In Training Set, Metrics:")
             logger.info(summary_metrics)
@@ -125,15 +122,9 @@ class ModelWrapper(object):
                 self.save_check_point()
                 self.start_epoches = epoch
                 logger.info('Successfully Store Checkpoint in epoch {}'.format(epoch+1))
-
-            val_loss_list.append(val_loss)
-            ep_loss_list.append(ep_loss / all_step)
-        # tensorboard plot
-        writer = SummaryWriter()
-        for i,loss in enumerate(ep_loss_list):
-            writer.add_scalar('Loss/Train', loss, i)
-        for i, loss in enumerate(val_loss_list):
-            writer.add_scalar('Loss/Validation', loss, i)
+            writer.add_scalar('Loss/Train', ep_loss, epoch)
+            writer.add_scalar('Loss/Validation',val_loss)
+        
         writer.close()
         
     def validate(self,dev_dataloader:Dataloader) -> Any:
