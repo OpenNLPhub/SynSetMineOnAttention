@@ -56,8 +56,8 @@ class ModelWrapper(object):
         wordset, attention_mask, token_type_ids, labels = item
         F = lambda x: torch.tensor(x).long().to(self.device)
         wordset = F(wordset)
-        attention_mask = F(wordset)
-        token_type_ids = F(wordset)
+        attention_mask = F(attention_mask)
+        token_type_ids = F(token_type_ids)
         tensor_labels = torch.tensor(labels).float().to(self.device)
         return wordset, attention_mask, token_type_ids, labels, tensor_labels
 
@@ -322,7 +322,7 @@ class ModelWrapper(object):
 
         return pred_word_sets
     
-    
+
     def evaluate(self, dataset:DataSet, pred_word_sets:Sequence[Any], function_list:Sequence[Callable[...,float]])->Sequence[Any]:
         """ Use Evaluating Function to Evaluate the final result
         Args:
