@@ -5,11 +5,20 @@
  * @desc 
 '''
 import os 
-cwd = os.getcwd()
-bertroot = os.path.join(cwd,'static')
+pwd = os.getcwd()
+bertroot = os.path.join(pwd,'static')
 BertPretrainedModelPath = {
     'bert-base-uncased' : os.path.join(bertroot,'bert-base-uncased')
 }
+
+
+from pathlib import Path
+cwd = Path.cwd()
+
+""" ------------- Path Config ------------- """
+NYT_DIR_PATH = Path.joinpath(cwd,'data','NYT')
+PubMed_DIR_PATH = Path.joinpath(cwd, 'data', 'PubMed')
+Wiki_DIR_PATH = Path.joinpath(cwd, 'data', 'Wiki')
 
 """ ---------------- Own Config ----------- """
 #default training Config
@@ -47,8 +56,8 @@ DataConfig = {
 ModelConfig = {
     'name' : 'SynSetMineOnBase',
     'version' : 'v1.0.0',
-    'embed_trans_hidden_size' : 250,
-    'post_trans_hidden_size' : 256,
+    'embed_trans_hidden_size' : [250],
+    'post_trans_hidden_size' : [256],
     'dropout' : 0.2
 }
 
