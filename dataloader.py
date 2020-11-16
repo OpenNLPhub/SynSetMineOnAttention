@@ -73,7 +73,7 @@ class DataSetDir(object):
         for idx,line in enumerate(lines[1:]):
             t = line.strip().split(' ')
             word, _ = t[0].split('||')
-            word2id[word] = 4+idx
+            word2id[word] = 5+idx
             nums = [ eval(i) for i in t[1:]]
             embed_matrix.append(nums)
         

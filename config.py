@@ -32,7 +32,8 @@ TrainingConfig ={
     'checkpoint_dir' : cwd.joinpath('checkpoint'),
     'batch_size' : 32,
     'result_out_dir' : cwd.joinpath('result'),
-    'cuda': 'cuda:0'
+    'cuda': 'cuda:0',
+    'bert_freeze': True
 }
 
 #default Operate Config
@@ -59,6 +60,5 @@ ModelConfig = {
     'embed_trans_hidden_size' : [250],
     'post_trans_hidden_size' : [256],
     'dropout' : 0.2,
-    'bert_freeze': True
 }
 
