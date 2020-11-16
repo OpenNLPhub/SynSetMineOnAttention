@@ -11,6 +11,7 @@ import torch.nn as nn
 from torch.nn.modules import dropout
 from transformers import BertModel
 from config import BertPretrainedModelPath
+import numpy as np
 
 class Embedding_layer(nn.Module):
     """embedding layer and provide some method to freeze layer parameters"""
@@ -119,7 +120,9 @@ class SynSetClassfier(nn.Module):
 
         x = self.output_map(x)
         # (batch_size, 1)
-        return x.squeeze(-1)
+        x = x.squeeze(-1)
+        x = torch.sigmoid(x)
+        return x
         # batch_size
 
             
