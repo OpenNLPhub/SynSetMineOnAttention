@@ -89,7 +89,7 @@ class SynSetClassfier(nn.Module):
         self.bert = component['bert']
         self.embedding = component['embedding']
         embedding_state_size_list = [
-            self.embedding.word_embeddings.embedding_dim,
+            self.embedding.dim,
             *config['embed_trans_hidden_size'],
             self.bert.embeddings.word_embeddings.embedding_dim
             ]
