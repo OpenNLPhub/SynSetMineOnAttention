@@ -268,6 +268,8 @@ class ModelWrapper(object):
         vocab = dataset.vocab
         words = vocab.keys()
         wordset_list = []
+        CLS = word2id['CLS']
+        SEP = word2id['SEP']
         # import pdb;pdb.set_trace()
         for word in words:
             wordid = word2id[word]
@@ -275,28 +277,32 @@ class ModelWrapper(object):
                 # Empty
                 wordset_list.append([wordid])
                 continue
-            new_wordset = [[*i, wordid] for i in wordset_list]
-            old_wordset = deepcopy(wordset_list)
-            itemsnum = len(new_wordset)
+            itemsnum = len(wordset_list)
             # add batch operation
             tmp_best_scores = 0
-            index = 0
+            index = 0       
             for ix in range(0,itemsnum,self.batch_size):
-                batch_new_wordset = new_wordset[ix:ix+self.batch_size]
-                batch_old_wordset = old_wordset[ix:ix+self.batch_size]
-                batch_old_wordset, mask = set_padding(batch_old_wordset)
-                batch_new_wordset, mask_ = set_padding(batch_new_wordset)
+                batch_new_wordset = wordset_list[ix:ix+self.batch_size]
+                input_ids = []
+                token_type_ids = []
+                for wordset in batch_new_wordset:
+                    input.ids.append([CLS,*wordset, SEP, *wordset, wordid,SEP])
+                    L = len(wordset) + 2
+                    token_type_ids.append([*([0]* L),*([1]*L)])
+                
+                input_ids, attention_mask = set_padding(input_ids)
+                token_type_ids, _ = set_padding(token_type_ids)
+
                 #batch_size * max_word_set_size
                 F = lambda x: torch.Tensor(x).long().to(self.device)
-                word_set_tensor, mask, new_word_set_tensor, mask_ = [
-                    F(i) for i in [batch_old_wordset, mask, batch_new_wordset, mask_]
+                input_ids, attention_mask, token_type_ids = [
+                    F(i) for i in [input_ids, attention_mask, token_type_ids]
                 ]
-                scores = self.best_model(word_set_tensor, mask, new_word_set_tensor, mask_)
+                scores = self.best_model(input_ids, attention_mask, token_type_ids)
                 best_scores = torch.max(scores).item()
                 if best_scores >= tmp_best_scores:
                     tmp_best_scores = best_scores
                     index = ix + torch.argmax(scores).item()
-
             if tmp_best_scores > self.threshold:
                 wordset_list[index].append(wordid)
             else:
@@ -315,7 +321,8 @@ class ModelWrapper(object):
                     f.write('\n')
 
         return pred_word_sets
-
+    
+    
     def evaluate(self, dataset:DataSet, pred_word_sets:Sequence[Any], function_list:Sequence[Callable[...,float]])->Sequence[Any]:
         """ Use Evaluating Function to Evaluate the final result
         Args:
