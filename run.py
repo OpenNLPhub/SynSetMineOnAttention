@@ -36,7 +36,7 @@ def test_clustertask(operateconfig:Dict,dataconfig:Dict, trainingconfig:Dict, mo
                 component = component,
                 config = modelconfig
             )
-    if trainingconfig['bert-freeze']:
+    if trainingconfig['bert_freeze']:
         model.freeze_bert_paramter()
     
     wrapper = ModelWrapper(model,trainingconfig)
