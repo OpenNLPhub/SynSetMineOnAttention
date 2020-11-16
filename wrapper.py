@@ -277,9 +277,9 @@ class ModelWrapper(object):
                 input_ids = []
                 token_type_ids = []
                 for wordset in batch_new_wordset:
-                    input.ids.append([CLS,*wordset, SEP, *wordset, wordid,SEP])
-                    L = len(wordset) + 2
-                    token_type_ids.append([*([0]* L),*([1]*L)])
+                    input.ids.append([CLS,wordid, SEP, *wordset, SEP])
+                    L = len(wordset) + 1
+                    token_type_ids.append([*([0]* 3),*([1]*L)])
                 
                 input_ids, attention_mask = set_padding(input_ids)
                 token_type_ids, _ = set_padding(token_type_ids)

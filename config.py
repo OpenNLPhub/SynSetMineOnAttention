@@ -57,7 +57,7 @@ DataConfig = {
 ModelConfig = {
     'name' : 'SynSetMineOnBase',
     'version' : 'v1.0.0',
-    'embed_trans_hidden_size' : [250],
+    'embed_trans_hidden_size' : [],
     'post_trans_hidden_size' : [256],
     'dropout' : 0.2,
 }

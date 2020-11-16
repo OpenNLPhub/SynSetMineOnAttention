@@ -304,12 +304,11 @@ class Dataloader(object):
             word_set, waiting_word, label = self.data[ix]
             word_id_set = [ self.word2id[word] for word in word_set]
             waiting_word_id = self.word2id[waiting_word]
-            new_word_id_set = word_id_set.copy()
-            new_word_id_set.append(waiting_word_id)
+
             
-            item = [CLS,*word_id_set,SEP,*new_word_id_set,SEP]
-            L = len(word_id_set)+2
-            token_type_ids = [*([0]*L), *([1]*L)]
+            item = [CLS,waiting_word_id,SEP,*word_id_set,SEP]
+            L = len(word_id_set) + 1
+            token_type_ids = [*([0]*3), *([1]*L)]
             batch_label.append(label)
             batch_item.append(item)
             batch_token_type_ids.append(token_type_ids)
