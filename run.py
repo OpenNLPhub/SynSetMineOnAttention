@@ -26,6 +26,7 @@ def test_clustertask(operateconfig:Dict,dataconfig:Dict, trainingconfig:Dict, mo
     datasetdir = DataSetDir(dir_path)
     # combine model
     embedding_layer = Embedding_layer.from_pretrained(datasetdir.embedding_vec)
+    
     embedding_layer.freeze_parameters()
     bert = getPretrainedBertModel('bert-base-uncased')
     component = {
@@ -67,7 +68,7 @@ def test_clustertask(operateconfig:Dict,dataconfig:Dict, trainingconfig:Dict, mo
                     batch_size=trainingconfig['batch_size']
                 )
         wrapper.train(train_dataloader=train_dataloader,dev_dataloader=dev_dataloader)
-
+    
     if operateconfig['test']:
         test_datasetitem = DataItemSet(
                     dataset=datasetdir.test_dataset,

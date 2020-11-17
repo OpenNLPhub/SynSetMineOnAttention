@@ -277,7 +277,7 @@ class ModelWrapper(object):
                 input_ids = []
                 token_type_ids = []
                 for wordset in batch_new_wordset:
-                    input.ids.append([CLS,wordid, SEP, *wordset, SEP])
+                    input_ids.append([CLS,wordid, SEP, *wordset, SEP])
                     L = len(wordset) + 1
                     token_type_ids.append([*([0]* 3),*([1]*L)])
                 

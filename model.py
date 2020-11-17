@@ -110,7 +110,7 @@ class SynSetClassfier(nn.Module):
             attention_mask: (batch_size, max_seq_len) 
             token_type_ids: (batch_size, max_seq_len) it label the world whether it belongs to new wordset or old wordset
         """
-
+        
         x = self.embedding(input_ids)
         # ( batch_size, max_seq_len, raw_emb_dim)
         x = self.embedding_map(x)
