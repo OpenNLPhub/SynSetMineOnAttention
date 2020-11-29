@@ -297,27 +297,19 @@ class Dataloader(object):
     def __iter__(self):
         ixs = list(range(0,len(self.data)))
         random.shuffle(ixs)
-        batch_item,batch_token_type_ids, batch_label = [], [], []
-        SEP = self.word2id['SEP']
-        CLS = self.word2id['CLS']
+        batch_word_set, batch_waiting_word, batch_label, = [], [], []
         for index,ix in enumerate(ixs):
             word_set, waiting_word, label = self.data[ix]
             word_id_set = [ self.word2id[word] for word in word_set]
             waiting_word_id = self.word2id[waiting_word]
-
-            
-            item = [CLS,waiting_word_id,SEP,*word_id_set,SEP]
-            L = len(word_id_set) + 1
-            token_type_ids = [*([0]*3), *([1]*L)]
+            batch_word_set.append(word_id_set)
             batch_label.append(label)
-            batch_item.append(item)
-            batch_token_type_ids.append(token_type_ids)
+            batch_waiting_word.append(waiting_word)
 
             if (index+1) % self.batch_size == 0 or index == len(self.data) - 1:
-                batch_item_, attention_mask = set_padding(batch_item)
-                batch_token_type_ids_, _ = set_padding(batch_token_type_ids)
-                yield batch_item_, attention_mask, batch_token_type_ids_, batch_label
-                batch_item,batch_token_type_ids, batch_label = [], [], []
+                batch_word_set_, attention_mask = set_padding(batch_word_set)
+                yield batch_word_set_, attention_mask, batch_waiting_word, batch_label
+                batch_word_set, batch_waiting_word, batch_label, = [], [], []
 
 
 def test_dataloader():
