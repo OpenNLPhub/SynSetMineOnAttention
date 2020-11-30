@@ -18,7 +18,7 @@ from numpy.core.defchararray import index
 from torch.utils import data
 from utils import set_padding
 import pickle
-
+from base.basedataloader import BaseDataLoader
 pattern = "(?<=\')[^\|\']*\|\|[^\|\']*?(?=\')"
 
 
@@ -283,7 +283,7 @@ class DataItemSet(object):
         return ans
 
 
-class Dataloader(object):
+class Dataloader(BaseDataLoader):
     """Dataloader to get batch size dataitem"""
     def __init__(self, dataitems:DataItemSet, word2id, batch_size:int) -> None:
         self.data = dataitems
@@ -323,7 +323,7 @@ def test_dataloader():
     dataitemset = DataItemSet(datasetdir.train_dataset,sampler,5)
     dataloader = Dataloader(dataitemset,datasetdir.word2id,32)
     for i,x in enumerate(dataloader):
-        item, attention_mask ,token_type_ids, labels = x
+        word_set, attention_mask, waiting_word, label = x
         import pdb;pdb.set_trace()
     
 
