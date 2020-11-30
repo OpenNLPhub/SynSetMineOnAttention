@@ -5,334 +5,140 @@
 @create date 2020-10-20 15:58:45
 @desc [description]
 '''
-from datetime import datetime
-import enum
 
-from numpy.core.defchararray import index
-from utils import set_padding
-import torch
+from datetime import datetime
+import typing as __t
+from numpy.lib.arraysetops import union1d
 import torch.nn as nn
-from torch import optim
-from torch.utils.tensorboard import SummaryWriter
-from typing import Any, Callable, Dict, Optional, Sequence
+import torch
 import numpy as np
-from dataloader import DataSet, Dataloader
-from pathlib import Path
 from log import logger
+from typing import Any, Callable, Dict, List, Optional, Sequence
 from copy import deepcopy
 from evaluate import EvalUnit,binary_confusion_matrix_evaluate
+from base.basewrapper import BaseWrapper
+from base.basedataloader import BaseDataLoader
 
-class ModelWrapper(object):
+class ModelWrapper(BaseWrapper):
     """Class to wrapper training and testing of deeplearning model
-    
     """
-    def __init__(self, model:nn.Module, trainingconfig:Dict) -> None:
-        super(ModelWrapper,self).__init__()
-        self.device = torch.device(trainingconfig['cuda']) if torch.cuda.is_available() else torch.device('cpu')
-        
-        # embedding_layer = Embedding_layer.load(modelconfig['word2vec_path'])
-        # embedding_layer.freeze_parameters()
-        # hidden_size = modelconfig['hidden_size']
-        # assert len(hidden_size) == 2
-        # scorer = Scorer(embedding_layer,hidden_size[0],hidden_size[1])
-        self.model = model
-        self.loss_fn = nn.BCELoss()
+    def __init__(self, model:nn.Module, config:Dict):
+        super(self, ModelWrapper).__init__(model,config)
+        self.required_mode.append('threshold')
+        self.threshold = self.getconfigattr('threshold')
 
-        self.start_epoches = 0
-        self.threshold = trainingconfig['threshold']
-        self.epoches = trainingconfig['epoch']
-        self.checkpoint_epoches = trainingconfig['checkpoint_epoch']
-        self.print_step = trainingconfig['print_step']
-        self.init_lr = trainingconfig['lr']
-
-        self.best_model = self.model.to(self.device)
-        self.best_loss = 1e10
-        self.best_score = 0
-        self.checkpoint_dir =trainingconfig['checkpoint_dir']
-        self.batch_size = trainingconfig['batch_size']
-        self.optimizer = optim.Adam(filter(lambda p: p.requires_grad, self.model.parameters()), lr=self.init_lr, amsgrad=True)
-        # optimizer is default 
-    def _trans_input_to_tensor(self,item:Sequence[Any]):
-        wordset, attention_mask, token_type_ids, labels = item
+    def __check_before_work(self,keys:List[str]):
+        for key in keys:
+            if key not in self.__dict__:
+                raise ValueError('{} is Missing in Wrapper instance')
+    
+    def __trans_np_to_tensor(self,item:Sequence[Any]):
+        wordset, attention_mask, waiting_word, labels = item
         F = lambda x: torch.tensor(x).long().to(self.device)
         wordset = F(wordset)
         attention_mask = F(attention_mask)
-        token_type_ids = F(token_type_ids)
+        waiting_word = F(waiting_word)
         tensor_labels = torch.tensor(labels).float().to(self.device)
-        return wordset, attention_mask, token_type_ids, labels, tensor_labels
-
-    def train(self, train_dataloader:Dataloader, dev_dataloader:Dataloader) -> None:
-        """Implementation to Batch Train the model
-        Args:
-            train_dataloader : training dataset iteration used to train model
-            dev_dataloader : development dataset iteration used to validate model
-                if dev_dataloader = None, it will split the trianing dataset to create dev dataset
-        Returns:
-            None
-        """
-        writer = SummaryWriter()
-
-        all_step = len(train_dataloader)
-        t = range(self.start_epoches, self.epoches)
-
+        return wordset, attention_mask, waiting_word, labels, tensor_labels
+    
+    def train(self):
+        self.__check_before_work(['dev_dataloader','train_dataloader'])
+        self.model.to(self.device)
+        t = range(self.start_epoch, self.epoches)
+        all_step = len(self.train_dataloader)
+        validation_flag = True if self.dev_dataloader is not None else False
         for epoch in t:
             self.model.train()
-            ep_loss = 0
-            summary_metrics = EvalUnit(0,0,0,0,'epoch'+str(epoch))
-            for step,item in enumerate(train_dataloader):
-                # word_set, mask, new_word_set, mask_, labels = item
-                # F = lambda x: torch.Tensor(x).long().to(self.device)
-                # word_set_tensor, mask, new_word_set_tensor, mask_ = [
-                #     F(i) for i in [word_set, mask, new_word_set, mask_]
-                # ]
-                input_ids, attention_mask, token_type_ids, labels, labels_tensor = self._trans_input_to_tensor(item)
-                pred_labels = self.model(input_ids, attention_mask, token_type_ids)
-                cur_loss = self.loss_fn(pred_labels,labels_tensor) / labels_tensor.shape[0]
-                ep_loss += cur_loss.item()
-                # backward
+            epoch_unit = EvalUnit(0,0,0,0,'sum')
+            ep_loss = 0.0
+            for step,item in enumerate(self.train_dataloader):
+                batch_word_set, attention_mask, waiting_word, labels , tensor_labels = self.__trans_np_to_tensor(item)
+                pred_ans = self.model(batch_word_set, attention_mask, waiting_word)
+                step_loss = self.loss_fn(pred_ans,tensor_labels) / tensor_labels.shape[0]
+                ep_loss += step_loss.item()
                 self.optimizer.zero_grad()
-                cur_loss.backward()
+                step_loss.backward()
                 self.optimizer.step()
-                # cal metrics
-                pred_labels = np.where(pred_labels.cpu().detach().numpy()>self.threshold, 1, 0)
-                # logger.info('{}'.format(step))
-                # if step == 20:
-                #     import pdb;pdb.set_trace()
-                unit = binary_confusion_matrix_evaluate(np.array(labels),pred_labels)
-                summary_metrics += unit
-                # log  
-                if (step+1) % self.print_step == 0 or step + 1 == all_step:
-                    desc = 'Epoch:{} {} / {} Loss:{}'.format(epoch+1,step+1,all_step,cur_loss.item())
-                    logger.info(desc)
-                # writer.add_scalar('Loss/Train Epoch{}'.format(epoch),cur_loss, step)
-            #log metrics
-            logger.info("In Training Set, Metrics:")
-            logger.info(summary_metrics)
 
-            #plot
-            # writer.add_scalar('Loss/Train',)
+                pred_labels = np.where(pred_ans.cpu().detach().numpy() > self.threshold,1,0)
+                unit = binary_confusion_matrix_evaluate(np.array(labels), pred_labels)
+                epoch_unit += unit
 
-            #validate
-            val_loss = self.validate(dev_dataloader)
+                if (step + 1) % self.print_step == 0 or step + 1 == all_step:
+                    logger.info('Training Epoch: {} step {}:{} Loss:{:.6f}'.format(
+                        epoch,step,all_step,step_loss
+                    ))
+            
+            #Train Evaluation
+            logger.info('Evaluation Training Epoch:{}'.format(epoch))
 
-            #save checkpoint
-            if (epoch + 1 == self.start_epoches + self.checkpoint_epoches or 
-                epoch + 1 == self.epoches):
-                #update best_model
-                self.save_check_point()
-                self.start_epoches = epoch
-                logger.info('Successfully Store Checkpoint in epoch {}'.format(epoch+1))
-            writer.add_scalar('Loss/Train', ep_loss, epoch)
-            writer.add_scalar('Loss/Validation',val_loss)
-        
-        writer.close()
-        
-    def validate(self,dev_dataloader:Dataloader) -> Any:
-        """Implementation to Batch validate the model using developed dataset
-        Args:
-            dev_dataloader : development dataset iteration used to validate model
-        """
-        self.model.eval()
-        val_loss = 0
-        summary_metrics = EvalUnit(name='Validation')
-        all_step = len(dev_dataloader)
-        for step,item in enumerate(dev_dataloader):
-            # word_set, mask, new_word_set, mask_, labels = item
-            # F = lambda x: torch.Tensor(x).long().to(self.device)
-            # word_set_tensor, mask, new_word_set_tensor, mask_ = [
-            #     F(i) for i in [word_set, mask, new_word_set, mask_]
-            # ]
-            # pred_labels = self.model(word_set_tensor, mask, new_word_set_tensor, mask_)
-            # labels_tensor = torch.Tensor(labels).float().to(self.device)
-            input_ids, attention_mask, token_type_ids, labels, labels_tensor = self._trans_input_to_tensor(item)
-            pred_labels = self.model(input_ids, attention_mask, token_type_ids)
-            cur_loss = self.loss_fn(pred_labels,labels_tensor) / labels_tensor.shape[0]
-            val_loss += cur_loss.item()
-            #metrics
-            pred_labels = np.where(pred_labels.cpu().detach().numpy()>self.threshold, 1, 0)
-            unit = binary_confusion_matrix_evaluate(np.array(labels),pred_labels)
-            summary_metrics += unit
-            if (step+1) % self.print_step == 0 or step + 1 == all_step:
-                logger.info("Validation: step / all_step : {} / {}, loss:{}".format(step+1,all_step,cur_loss.item()))
-
-        #log
-        desc = 'In Validation, Average Loss:{:.2f}'.format(val_loss / all_step)
-        logger.info(desc)
-        logger.info(summary_metrics)
-
-        if summary_metrics.f1_score() >= self.best_score:
-            self.best_loss = val_loss
-            self.best_score = summary_metrics.f1_score()
-            self.best_model = deepcopy(self.model)
-            logger.info('Successfully Update Best Model')
-        
-        return val_loss / all_step
-   
-    def test(self, test_dataloader:Dataloader) -> None:
-        """Implementation to Batch test the model using developed dataset
-        Args:
-            test_dataloader : test dataset iteration used to test the model
-        """
-        self.best_model.eval()
-        self.best_model.to(self.device)
-        all_step = len(test_dataloader)
-        summary_metrics = EvalUnit()
-        for step,item in enumerate(test_dataloader):
-            input_ids, attention_mask, token_type_ids, labels, labels_tensor = self._trans_input_to_tensor(item)
-            pred_labels = self.best_model(input_ids, attention_mask, token_type_ids)
-            # word_set, mask, new_word_set, mask_, labels = item 
-            # F = lambda x: torch.Tensor(x).long().to(self.device)
-            # word_set_tensor, mask, new_word_set_tensor, mask_ = [
-            #     F(i) for i in [word_set, mask, new_word_set, mask_]
-            # ]
-            # pred_labels = self.best_model(word_set_tensor, mask, new_word_set_tensor, mask_)
-            pred_labels = np.where(pred_labels.cpu().detach().numpy()>self.threshold, 1, 0)
-            # cal metrics
-            unit = binary_confusion_matrix_evaluate(np.array(labels),pred_labels)
-            summary_metrics += unit
-            logger.info("Test: step / all_step : {} / {}".format(step+1,all_step))
-
-        logger.info("In Test DataSet")
-        logger.info(summary_metrics)
-    
-    def load_check_point(self,file_name:Optional[str] = None) -> None:
-        """load the save model file
-        Args:
-            file_name: filename not filepath, it will concatenate the checkpoint_dir and filename 
-                to create the whole path. It filename is none, it will choose the latest checkpoint file
-                under the checkpoint directory.
-        """
-        dir_path = Path(self.checkpoint_dir)
-        if file_name == None:
-            import os
-            flist = os.listdir(dir_path)
-            if not flist:
-                logger.info('No checkpoint file')
-                raise ValueError()
-            filepath = Path.joinpath(dir_path,max(flist))
-        else:
-            filepath = Path.joinpath(dir_path,file_name)
-        checkpoint = torch.load(filepath, map_location='cpu')
-        self.best_loss = checkpoint['best_loss']
-        self.start_epoches = checkpoint['epoch']
-        self.model.load_state_dict(checkpoint['state_dict'])
-        self.model.to(self.device)
-        self.best_model.load_state_dict(checkpoint['best_model'])
-        self.optimizer.load_state_dict(checkpoint['optimizer'])
-        self.best_score = checkpoint['best_score']
-    
-    def save_check_point(self) -> None:
-        """ save the key attribute in this wrapper
-        key attribute:
-        d = {
-            'epoch' : epoch,
-            'state_dict' : model.state_dict(),
-            'optimizer' : optimizer.state_dict(),
-            'best_loss' : best_loss,
-            'best_score' : best_score,
-            'best_model' : best_pred
-        }
-        """
-        dir_path = Path(self.checkpoint_dir)
-        now = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
-        filepath = Path.joinpath(dir_path,self.model.name+'_'+self.model.version+'_'+now+'_checkpoint.pth.tar')
-        d = {
-            'epoch':self.start_epoches,
-            'state_dict' : self.model.state_dict(),
-            'optimizer' : self.optimizer.state_dict(),
-            'best_loss' : self.best_loss,
-            'best_model' : self.best_model.state_dict(),
-            'best_score' : self.best_score
-        }
-        torch.save(d, filepath)
-    
-    def cluster_predict(self, dataset:DataSet, word2id:Dict, outputfile:Optional[Path]) -> Sequence[Any]:
-        """Using Model to cluster wordset
-        Args:
-            dataset: it's self defined class, in DataSet, we use vocab to get all words and true cluster result
-            word2id: it is got from embedding file, translate word to embedding index
-            outputfile: outputfile path
-        Returns:
-            List of word sets
-        """
-        self.best_model.eval()
-        vocab = dataset.vocab
-        words = vocab.keys()
-        wordset_list = []
-        CLS = word2id['CLS']
-        SEP = word2id['SEP']
-        # import pdb;pdb.set_trace()
-        for word in words:
-            wordid = word2id[word]
-            if not wordset_list:
-                # Empty
-                wordset_list.append([wordid])
-                continue
-            itemsnum = len(wordset_list)
-            # add batch operation
-            tmp_best_scores = 0
-            index = 0       
-            for ix in range(0,itemsnum,self.batch_size):
-                batch_new_wordset = wordset_list[ix:ix+self.batch_size]
-                input_ids = []
-                token_type_ids = []
-                for wordset in batch_new_wordset:
-                    input_ids.append([CLS,wordid, SEP, *wordset, SEP])
-                    L = len(wordset) + 1
-                    token_type_ids.append([*([0]* 3),*([1]*L)])
-                
-                input_ids, attention_mask = set_padding(input_ids)
-                token_type_ids, _ = set_padding(token_type_ids)
-
-                #batch_size * max_word_set_size
-                F = lambda x: torch.Tensor(x).long().to(self.device)
-                input_ids, attention_mask, token_type_ids = [
-                    F(i) for i in [input_ids, attention_mask, token_type_ids]
-                ]
-                scores = self.best_model(input_ids, attention_mask, token_type_ids)
-                best_scores = torch.max(scores).item()
-                if best_scores >= tmp_best_scores:
-                    tmp_best_scores = best_scores
-                    index = ix + torch.argmax(scores).item()
-            if tmp_best_scores > self.threshold:
-                wordset_list[index].append(wordid)
+            if validation_flag:
+                # it will update model in validation method
+                score = self.validation()
             else:
-                wordset_list.append([wordid])
-        #id2word
-        # import pdb;pdb.set_trace()
-        id2word = { j:i for i,j in word2id.items()}
-        F = lambda x:[ id2word[i] for i in x]
-        pred_word_sets = [ F(wordset) for wordset in wordset_list]
-        
-        if outputfile is not None:
-            with open(outputfile, 'w', encoding='utf-8') as f:
-                for pred_word_set in pred_word_sets:
-                    for word in pred_word_set:
-                        f.write(word+' ')
-                    f.write('\n')
+                #No Validation Model
+                #update best model according to performance in Trainning DataSet
+                score = epoch_unit.f1_score()
 
-        return pred_word_sets
+            # using f1_score to update standard line
+            if self.best_score < score:
+                self.best_model = score
+                self.best_model = deepcopy(self.model)
+            logger.info("Training Evaluation Epoch :{}".format(epoch))
+            logger.info(epoch_unit)
+            
+
+            
+    @__t.overload
+    def train(self,train_dataloader:BaseDataLoader, dev_dataloader:Optional[BaseDataLoader]):
+        self.train_dataloader = train_dataloader
+        self.dev_dataloader = dev_dataloader
+        self.train()
+  
+    def validation(self):
+        self.model.eval()
+        all_step = len(self.dev_dataloader)
+        validation_unit = EvalUnit(0,0,0,0,'Evaluation')
+
+        for step, item in enumerate(self.dev_dataloader):
+            batch_word_set, attention_mask, waiting_word, labels , tensor_labels = self.__trans_np_to_tensor(item)
+            pred_ans = self.model(batch_word_set, attention_mask, waiting_word)
+            step_loss = self.loss_fn(pred_ans,tensor_labels) / tensor_labels.shape[0]
+            pred_labels = np.where(pred_ans.cpu().detach().numpy() > self.threshold,1,0)
+            unit = binary_confusion_matrix_evaluate(np.array(labels), pred_labels)
+            validation_unit += unit
+
+            if (step + 1) % self.print_step == 0 or step + 1 == all_step:
+                logger.info('Validation {}:{} Loss: {:.6f}'.format(step, all_step,step_loss))
+
+        logger.info("Validation Evaluation:")
+        logger.info(validation_unit)
+        return validation_unit.f1_score()
+
+    def test_performance(self):
+        self.__check_before_work(['test_dataloader'])
+        '''
+        Test Performance
+        '''
+        self.best_model.eval()
+        test_unit = EvalUnit(0,0,0,0,'Test')
+        for step,item in enumerate(self.test_dataloader):
+            batch_word_set, attentionn_mask, waitinng_word, labels, _ = self.__trans_np_to_tensor(item)
+            pred_ans = self.best_model(batch_word_set, attentionn_mask, waitinng_word)
+            pred_labels = np.where(pred_ans.cpu().detach().numpy() > self.threshold,1,0)      
+            unit = binary_confusion_matrix_evaluate(np.array(labels), pred_labels)
+            test_unit += unit
+        logger.info("Test Performance Evaluation:")
+        logger.info(test_unit)
+
+
+    @__t.overload
+    def test_performance(self,test_dataloader:BaseDataLoader):
+        self.test_dataloader = test_dataloader
+        self.test_performance()
+
+
+
+
+
     
-
-    def evaluate(self, dataset:DataSet, pred_word_sets:Sequence[Any], function_list:Sequence[Callable[...,float]])->Sequence[Any]:
-        """ Use Evaluating Function to Evaluate the final result
-        Args:
-            dataset: it's self defined class, we use vocab attribute to get true cluster result
-            pred_word_set: the output of cluster_predict method | List of word sets
-            function_list: the list of evaluating function which have two input pred_cluster and target_cluster
-        """
-
-        #trans datatype 
-        clusters = set(dataset.vocab.values())
-        cluster2id = {cluster:idx for idx,cluster in enumerate(clusters)}
-        target_cluster = {key:cluster2id[value] for key,value in dataset.vocab.items()}
-        pred_cluster = {}
-        # import pdb;pdb.set_trace()
-        for idx,pred_word_set in enumerate(pred_word_sets):
-            for word in pred_word_set:
-                pred_cluster[word] = idx
-        # import pdb;pdb.set_trace()
-        ans = []
-        for func in function_list:
-            ans.append(func(pred_cluster = pred_cluster,target_cluster = target_cluster))
-        return ans
