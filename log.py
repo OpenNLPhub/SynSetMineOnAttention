@@ -3,7 +3,7 @@ from datetime import datetime
 import os
 
 
-logger =  logging.getLogger('WenQA_DGCNN')
+logger =  logging.getLogger('SynSetMine_Attention')
 logger.setLevel(logging.INFO)
 
 fmt = '[%(asctime)s]-[%(levelname)s]-%(message)s'
