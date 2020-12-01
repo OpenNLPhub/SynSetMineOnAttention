@@ -90,12 +90,12 @@ class BaseWrapper(object):
         now = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
         if filename is None:
             if epoch is None:
-                filename = self.model.name+'_'+self.model.version+'_'+now+'_checkpoint.pth.tar'
+                filename = self.model.name+'_'+self.model.version+'_'+'best_model'+'_checkpoint.pth.tar'
             filename = self.model.name+'_'+self.model.version+'_'+'epoch:'+str(epoch)+'_'+now+'_checkpoint.pth.tar'
         
         filepath = Path.joinpath(dir_path, filename)
         d = {
-            'epoch':self.start_epoches,
+            'epoch':self.start_epoch,
             'state_dict' : self.model.state_dict(),
             'optimizer' : self.optimizer.state_dict(),
             'best_model' : self.best_model.state_dict(),

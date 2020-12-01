@@ -6,11 +6,15 @@
 @desc [description]
 '''
 
+from os import wait
+from pathlib import Path
+from dataloader import DataSet
 from datetime import datetime
 import typing as __t
 from numpy.lib.arraysetops import union1d
 import torch.nn as nn
 import torch
+from torch.utils.tensorboard import SummaryWriter
 import numpy as np
 from log import logger
 from typing import Any, Callable, Dict, List, Optional, Sequence
@@ -18,6 +22,7 @@ from copy import deepcopy
 from evaluate import EvalUnit,binary_confusion_matrix_evaluate
 from base.basewrapper import BaseWrapper
 from base.basedataloader import BaseDataLoader
+from utils import set_padding
 
 class ModelWrapper(BaseWrapper):
     """Class to wrapper training and testing of deeplearning model
@@ -26,6 +31,8 @@ class ModelWrapper(BaseWrapper):
         super(ModelWrapper,self).__init__(model,config)
         self.required_mode.append('threshold')
         self.threshold = self.getconfigattr('threshold',config=config)
+        
+        self.writer = SummaryWriter()
 
     def __check_before_work(self,keys:List[str]):
         for key in keys:
@@ -66,9 +73,10 @@ class ModelWrapper(BaseWrapper):
 
                 if (step + 1) % self.print_step == 0 or step + 1 == all_step:
                     logger.info('Training Epoch: {} step {}/{} Loss:{:.6f}'.format(
-                        epoch,step,all_step,step_loss
+                        epoch,step + 1,all_step,step_loss
                     ))
-            
+            #Writer
+            self.writer.add_scalar('Loss/train',ep_loss/all_step,epoch)
             #Train Evaluation
             logger.info('Evaluation Training Epoch:{}'.format(epoch))
 
@@ -79,14 +87,22 @@ class ModelWrapper(BaseWrapper):
                 #No Validation Model
                 #update best model according to performance in Trainning DataSet
                 score = epoch_unit.f1_score()
-
+            
+            self.writer.add_scalar('F1_score in Validation:',score,epoch)
+            
             # using f1_score to update standard line
             if self.best_score < score:
                 self.best_model = score
                 self.best_model = deepcopy(self.model)
+                self.save_check_point()
+                logger.info("Update BEST MODEL !")
+            
             logger.info("Training Evaluation Epoch :{}".format(epoch))
             logger.info(epoch_unit)
-            
+
+            if (epoch + 1) % self.checkpoint_epoch == 0 or epoch + 1 == self.epoches:
+                self.save_check_point(epoch=epoch)
+
 
             
     def train(self,train_dataloader:BaseDataLoader, dev_dataloader:Optional[BaseDataLoader]):
@@ -134,8 +150,81 @@ class ModelWrapper(BaseWrapper):
         self.test_dataloader = test_dataloader
         self.test_performance_()
 
+    def cluster_predict(self,dataset:DataSet,word2id:Dict,outputfile:Optional[Path]) -> Sequence[Any]:
+        """Using Binary Classifer to cluster wordset
+        Args:
+            dataset: it's self defined class, in DataSet, we use vocab to get all words and true cluster result
+            word2id: it is got from embedding file, translate word to embedding index
+            outputfile: outputfile path
+        Returns:
+            List of word sets
+        """
+        self.best_model.eval()
+        vocab = dataset.vocab
+        words = vocab.keys()
+        wordset_list = []
+        for word in words:
+            wordid = word2id[word]
+            if not wordset_list:
+                #Empty
+                wordset_list.append([wordid])
+                continue
+            itemsum = len(wordset_list)
+            tmp_best_scores = 0
+            index = 0
+            for ix in range(0,itemsum,self.batch_size):
+                batch_word_set = wordset_list[ix:ix+self.batch_size]
+                batch_waiting_word = [wordid] * len(batch_word_set)
+                batch_word_set, attention_mask = set_padding(batch_word_set)
+                batch_word_set, attention_mask, batch_waiting_word, _, _ = self.__trans_np_to_tensor(
+                    [batch_word_set, attention_mask, batch_waiting_word, 0]
+                )
+                scores = self.best_model(batch_word_set, attention_mask, batch_waiting_word)
+                best_scores = torch.max(scores).item()
+                
+                if best_scores >= tmp_best_scores:
+                    tmp_best_scores = best_scores
+                    index = ix + torch.argmax(scores).item()
+            
+            if tmp_best_scores > self.threshold:
+                wordset_list[index].append(wordid)
+            else:
+                wordset_list.append([wordid])
+        
+        #id2word
+        # import pdb;pdb.set_trace()
+        id2word = { j:i for i,j in word2id.items()}
+        F = lambda x:[ id2word[i] for i in x]
+        pred_word_sets = [ F(wordset) for wordset in wordset_list]
+        
+        if outputfile is not None:
+            with open(outputfile, 'w', encoding='utf-8') as f:
+                for pred_word_set in pred_word_sets:
+                    for word in pred_word_set:
+                        f.write(word+' ')
+                    f.write('\n')
 
+        return pred_word_sets
 
-
-
+    def evaluate(self, dataset:DataSet, pred_word_sets:Sequence[Any], function_list:Sequence[Callable[...,float]])->Sequence[Any]:
+        """ Use Evaluating Function to Evaluate the final result
+        Args:
+            dataset: it's self defined class, we use vocab attribute to get true cluster result
+            pred_word_set: the output of cluster_predict method | List of word sets
+            function_list: the list of evaluating function which have two input pred_cluster and target_cluster
+        """
+        #trans datatype 
+        clusters = set(dataset.vocab.values())
+        cluster2id = {cluster:idx for idx,cluster in enumerate(clusters)}
+        target_cluster = {key:cluster2id[value] for key,value in dataset.vocab.items()}
+        pred_cluster = {}
+        # import pdb;pdb.set_trace()
+        for idx,pred_word_set in enumerate(pred_word_sets):
+            for word in pred_word_set:
+                pred_cluster[word] = idx
+        # import pdb;pdb.set_trace()
+        ans = []
+        for func in function_list:
+            ans.append(func(pred_cluster = pred_cluster,target_cluster = target_cluster))
+        return ans
     
