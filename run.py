@@ -6,9 +6,11 @@
 '''
 
 from typing import Any,Dict
+import torch
+import torch.optim as optim
 from dataloader import DataSetDir, DataSet, Dataloader, DataItemSet,select_sampler
 from wrapper import ModelWrapper
-from model import Embedding_layer, getPretrainedBertModel, SynSetClassfier
+from model import Embedding_layer, Attention_layer, BinarySynClassifierBaseOnAttention
 from evaluate import select_evaluate_func
 import config 
 from config import TrainingConfig,OperateConfig,DataConfig,ModelConfig
@@ -28,18 +30,15 @@ def test_clustertask(operateconfig:Dict,dataconfig:Dict, trainingconfig:Dict, mo
     embedding_layer = Embedding_layer.from_pretrained(datasetdir.embedding_vec)
     
     embedding_layer.freeze_parameters()
-    bert = getPretrainedBertModel('bert-base-uncased')
-    component = {
-        'bert' : bert,
-        'embedding' : embedding_layer
-    }
-    model = SynSetClassfier(
-                component = component,
+    attenion_layer = Attention_layer(embedding_layer.dim,modelconfig['attention_hidden_size'])
+    modelconfig['attention'] = attenion_layer
+    modelconfig['embedding'] = embedding_layer
+    model = BinarySynClassifierBaseOnAttention(
                 config = modelconfig
             )
-    if trainingconfig['bert_freeze']:
-        model.freeze_bert_paramter()
-    
+    optimizer = optim.Adam(filter(lambda x : x.requires_grad , model.parameters()),lr=trainingconfig['lr'], amsgrad=True)
+    trainingconfig['optim'] = optimizer
+    trainingconfig['loss_fn'] = torch.nn.BCELoss()
     wrapper = ModelWrapper(model,trainingconfig)
     
     if operateconfig['resume']:
@@ -76,14 +75,12 @@ def test_clustertask(operateconfig:Dict,dataconfig:Dict, trainingconfig:Dict, mo
                     negative_sample_size = dataconfig['test_negative_sample_size']
                 )
 
-
-
         test_dataloader = Dataloader(
                     dataitems=test_datasetitem,
                     word2id=datasetdir.word2id,
                     batch_size=trainingconfig['batch_size']
                 )
-        wrapper.test(test_dataloader=test_dataloader)
+        wrapper.test_performance(test_dataloader=test_dataloader)
 
     if operateconfig['predict']:
         func_list = select_evaluate_func(operateconfig['eval_function'])

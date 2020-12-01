@@ -23,9 +23,9 @@ class ModelWrapper(BaseWrapper):
     """Class to wrapper training and testing of deeplearning model
     """
     def __init__(self, model:nn.Module, config:Dict):
-        super(self, ModelWrapper).__init__(model,config)
+        super(ModelWrapper,self).__init__(model,config)
         self.required_mode.append('threshold')
-        self.threshold = self.getconfigattr('threshold')
+        self.threshold = self.getconfigattr('threshold',config=config)
 
     def __check_before_work(self,keys:List[str]):
         for key in keys:
@@ -41,7 +41,7 @@ class ModelWrapper(BaseWrapper):
         tensor_labels = torch.tensor(labels).float().to(self.device)
         return wordset, attention_mask, waiting_word, labels, tensor_labels
     
-    def train(self):
+    def train_(self):
         self.__check_before_work(['dev_dataloader','train_dataloader'])
         self.model.to(self.device)
         t = range(self.start_epoch, self.epoches)
@@ -65,7 +65,7 @@ class ModelWrapper(BaseWrapper):
                 epoch_unit += unit
 
                 if (step + 1) % self.print_step == 0 or step + 1 == all_step:
-                    logger.info('Training Epoch: {} step {}:{} Loss:{:.6f}'.format(
+                    logger.info('Training Epoch: {} step {}/{} Loss:{:.6f}'.format(
                         epoch,step,all_step,step_loss
                     ))
             
@@ -89,11 +89,10 @@ class ModelWrapper(BaseWrapper):
             
 
             
-    @__t.overload
     def train(self,train_dataloader:BaseDataLoader, dev_dataloader:Optional[BaseDataLoader]):
         self.train_dataloader = train_dataloader
         self.dev_dataloader = dev_dataloader
-        self.train()
+        self.train_()
   
     def validation(self):
         self.model.eval()
@@ -109,13 +108,13 @@ class ModelWrapper(BaseWrapper):
             validation_unit += unit
 
             if (step + 1) % self.print_step == 0 or step + 1 == all_step:
-                logger.info('Validation {}:{} Loss: {:.6f}'.format(step, all_step,step_loss))
+                logger.info('Validation {}/{} Loss: {:.6f}'.format(step, all_step,step_loss))
 
         logger.info("Validation Evaluation:")
         logger.info(validation_unit)
         return validation_unit.f1_score()
 
-    def test_performance(self):
+    def test_performance_(self):
         self.__check_before_work(['test_dataloader'])
         '''
         Test Performance
@@ -131,11 +130,9 @@ class ModelWrapper(BaseWrapper):
         logger.info("Test Performance Evaluation:")
         logger.info(test_unit)
 
-
-    @__t.overload
     def test_performance(self,test_dataloader:BaseDataLoader):
         self.test_dataloader = test_dataloader
-        self.test_performance()
+        self.test_performance_()
 
 
 

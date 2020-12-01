@@ -73,9 +73,9 @@ def getFCLayer(state_size_list:List,add_dropout:bool=False,dropout:float= 0.2) -
     for ix,(i,j) in enumerate(size_tuple):
         if ix != 0:
             L.append(nn.ReLU())
-        bias = True if ix == len(L) - 1 else False
+        bias = True if ix == len(in_size) - 1 else False
         L.append(nn.Linear(i,j,bias=bias))
-        if add_dropout:
+        if add_dropout and ix!= len(in_size) - 1:
             L.append(nn.Dropout(dropout))
     return nn.Sequential(*L)
         
@@ -163,12 +163,12 @@ def calculate_attention(query:torch.Tensor,key:torch.Tensor,value:torch.Tensor,m
 
 class Attention_layer(nn.Module):
     """Attention Unit"""
-    def __self__(self,kernel_input:int, kernel_output:int):
-        super(self,Attention_layer).__init__()
-        key_kernel = nn.Linear(kernel_input, kernel_output)
-        query_kernel = nn.Linear(kernel_input, kernel_output)
-        value_kernel = nn.Linear(kernel_input, kernel_output)
-        normalize_kernel = nn.Linear(kernel_output,1,bias = False)
+    def __init__(self,kernel_input:int, kernel_output:int):
+        super(Attention_layer,self).__init__()
+        self.key_kernel = nn.Linear(kernel_input, kernel_output)
+        self.query_kernel = nn.Linear(kernel_input, kernel_output)
+        self.value_kernel = nn.Linear(kernel_input, kernel_output)
+        self.normalize_kernel = nn.Linear(kernel_output,1,bias = False)
 
     def forward(self,x:torch.Tensor, mask:torch.Tensor):
         """
@@ -187,17 +187,17 @@ class Attention_layer(nn.Module):
         #batch_size, max_seq_len, 1
         return att_output
 
-class BinarySynClassifierBaseOnAttentionn(nn.Module):
+
+class BinarySynClassifierBaseOnAttention(nn.Module):
     """SynSet Classifier Based on Attention"""
 
     def __init__(self,config:Dict):
-        super(self,BinarySynClassifierBaseOnAttentionn).__init__()
-        config = config
+        super(BinarySynClassifierBaseOnAttention,self).__init__()
         self.name = config['name']
         self.version = config['version']
         self.embedding = config['embedding']
         self.attention_unit = config['attention']
-        self.classifier = getFCLayer([self.embedding.dim * 5, *config['classifier_hidden_size']], 1)
+        self.classifier = getFCLayer([self.embedding.dim * 5, *config['classifier_hidden_size'], 1],True)
 
     def forward(self,word_set:torch.Tensor,mask:torch.Tensor,waiting_word:torch.Tensor):
         """
@@ -222,8 +222,7 @@ class BinarySynClassifierBaseOnAttentionn(nn.Module):
 
         ans = self.classifier(com_feature)
         # batch_size , 1
-
-        return torch.sigmoid(ans)
+        return torch.sigmoid(ans).squeeze(-1)
 
     def extract_feature(self,x:torch.Tensor,y:torch.Tensor):
         add_feature = x + y

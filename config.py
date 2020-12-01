@@ -22,10 +22,9 @@ Wiki_DIR_PATH = Path.joinpath(cwd, 'data', 'Wiki')
 
 """ ---------------- Own Config ----------- """
 #default training Config
-TrainingConfig ={
-    'loss_fn' : 'crossEntropy',
+TrainingConfig = {
     'threshold' :  0.5,
-    'epoch' : 100,
+    'epoches' : 100,
     'checkpoint_epoch' : 5,
     'print_step' : 15,
     'lr' : 1e-4,
@@ -48,7 +47,7 @@ OperateConfig = {
 #default dataconfig
 DataConfig = {
     'data_dir_path' : None,
-    'sample_strategy' : 'sample_size_repeat_size',
+    'sample_strategy' : 'sample_large_size_enumerate',
     'negative_sample_size' : 20,
     'test_negative_sample_size' : 10
 }
@@ -57,8 +56,7 @@ DataConfig = {
 ModelConfig = {
     'name' : 'SynSetMineOnBase',
     'version' : 'v1.0.0',
-    'embed_trans_hidden_size' : [],
-    'post_trans_hidden_size' : [256],
-    'dropout' : 0.2,
+    'attention_hidden_size': 256,
+    'classifier_hidden_size': [512,256]
 }
 
