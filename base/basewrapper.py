@@ -16,15 +16,14 @@ from base.basedataloader import BaseDataLoader
 class BaseWrapper(object):
     """Base class for Wrapper
     """
-    def self(self,model:nn.Module, config:Dict):
-        super(self,BaseWrapper).__self__()
-
+    def __init__(self,model:nn.Module, config:Dict):
+        super(BaseWrapper,self).__init__()
         self.required_mode = [
             'loss_fn', 'checkpoint_epoch', 'print_step', 'batch_size', 'lr', 'checkpoint_dir', 'cuda',
             'optim', 'epoches'
             ]
     
-        F = lambda key:F(key,config)
+        F = lambda key: self.getconfigattr(key,config)
         
         self.model = model
         self.device = torch.device(config['cuda']) if torch.cuda.is_available() else torch.device('cpu')
@@ -32,7 +31,7 @@ class BaseWrapper(object):
         self.loss_fn = F('loss_fn')
         self.start_epoch = 0
         self.epoches = F('epoches')
-        self.checkpoint_epoch = F('checkpoinnt_epoch')
+        self.checkpoint_epoch = F('checkpoint_epoch')
         self.print_step = F('print_step')
         self.init_lr = F('lr')
         self.best_model = self.model
@@ -53,30 +52,28 @@ class BaseWrapper(object):
             if key in self.required_mode:
                 raise ValueError('Attribute {} is required in this model wrapper'.format(key))
             else:
-                warnings.warn('Attribute {} is not in config'.format(key))
-        return config.get(key, default=None)
-            
+                desc = 'Attribute {} is not in config'.format(key)
+                warnings.warn(desc)
+                return None
+        return config[key]
 
-    def train(self):
+
+    def train(self,train_dataloader:BaseDataLoader, dev_dataloader:Optional[BaseDataLoader])->None:
+        raise NotImplementedError()       
+
+    def train_(self):
         raise NotImplementedError()
     
-    @__t.overload
-    def train(self,train_dataloader:BaseDataLoader, dev_dataloader:Optional[BaseDataLoader]):
-        raise NotImplementedError()
-    
+
     def validation(self):
         raise NotImplementedError()
-    
-    @__t.overload
-    def validation(self,dev_dataloader:BaseDataLoader):
+
+    def test_performance(self,test_dataloader:BaseDataLoader)->None:
         raise NotImplementedError()
 
-    def test_performance(self):
+    def test_performance_(self):
         raise NotImplementedError()
     
-    @__t.overload
-    def test_performance(self):
-        raise NotImplementedError()
 
     def save_check_point(self, filename:str = None, epoch:int = None) -> None:
         """ save the key attribute in this wrapper
