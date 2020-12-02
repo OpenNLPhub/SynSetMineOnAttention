@@ -52,7 +52,7 @@ def test_clustertask(operateconfig:Dict,dataconfig:Dict, trainingconfig:Dict, mo
                     negative_sample_size = dataconfig['negative_sample_size']
                 ) 
         dev_datasetitem = DataItemSet(
-                    dataset=datasetdir.dev_dataset,
+                    dataset=datasetdir.test_dataset,
                     sampler = select_sampler(dataconfig['sample_strategy']),
                     negative_sample_size = dataconfig['test_negative_sample_size']
                 )

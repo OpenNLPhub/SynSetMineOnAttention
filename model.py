@@ -163,13 +163,13 @@ def calculate_attention(query:torch.Tensor,key:torch.Tensor,value:torch.Tensor,m
 
 class Attention_layer(nn.Module):
     """Attention Unit"""
-    def __init__(self,kernel_input:int, kernel_output:int):
+    def __init__(self,kernel_input:int, kernel_output:int,dropout:int = 0.2):
         super(Attention_layer,self).__init__()
         self.key_kernel = nn.Linear(kernel_input, kernel_output)
         self.query_kernel = nn.Linear(kernel_input, kernel_output)
         self.value_kernel = nn.Linear(kernel_input, kernel_output)
         self.normalize_kernel = nn.Linear(kernel_output,1,bias = False)
-
+        self.dropout = nn.Dropout(dropout)
     def forward(self,x:torch.Tensor, mask:torch.Tensor):
         """
         @params:
@@ -183,6 +183,7 @@ class Attention_layer(nn.Module):
         
         att_output = calculate_attention(query, key, value, mask)
         #batch_size, max_seq_len, hidden_size
+        att_output = self.dropout(att_output)
         att_output = self.normalize_kernel(att_output)
         #batch_size, max_seq_len, 1
         return att_output
@@ -198,7 +199,8 @@ class BinarySynClassifierBaseOnAttention(nn.Module):
         self.embedding = config['embedding']
         self.attention_unit = config['attention']
         self.classifier = getFCLayer([self.embedding.dim * 5, *config['classifier_hidden_size'], 1],True)
-
+        self.mapper = nn.Linear(self.embedding.dim, self.embedding.dim,bias=False)
+    
     def forward(self,word_set:torch.Tensor,mask:torch.Tensor,waiting_word:torch.Tensor):
         """
         @params:
@@ -218,6 +220,9 @@ class BinarySynClassifierBaseOnAttention(nn.Module):
         word_set_vec = torch.sum(word_set_weight * word_set, dim = 1)
         # batch_size, word_vec_size
 
+        word_set_vec = self.mapper(word_set_vec)
+        waiting_word = self.mapper(waiting_word)
+        
         com_feature = self.extract_feature(word_set_vec, waiting_word)
 
         ans = self.classifier(com_feature)

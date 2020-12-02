@@ -214,9 +214,8 @@ class Smaple_large_size_enumerate(DataItemSampler):
                 (pos_word, pos_word, 1),
                 (pos_word, neg_word, 0)
             ]
-            return ans, 1, 1, 1
-        
-        sub_word_set_range = range(2,setsize+1)
+            return ans, 1.0, 1, 1
+        sub_word_set_range = range(2,setsize+1) if setsize > 2 else range(1,setsize)
         pos_item_nums = 0
         neg_item_nums = 0
         ave_subset_size = 0.0
@@ -375,14 +374,16 @@ def test_dataloader():
     dataitemset = DataItemSet(datasetdir.train_dataset,sampler,5)
     print(dataitemset)
     
-    sampler_ = select_sampler('sample_size_repeat_size')
-    dataitemset_ = DataItemSet(datasetdir.train_dataset,sampler_,5)
-    print(dataitemset_)
+    # sampler_ = select_sampler('sample_size_repeat_size')
+    # dataitemset_ = DataItemSet(datasetdir.train_dataset,sampler_,5)
+    # print(dataitemset_)
 
     dataloader = Dataloader(dataitemset,datasetdir.word2id,32)
     # for i,x in enumerate(dataloader):
     #     word_set, attention_mask, waiting_word, label = x
-    #     import pdb;pdb.set_trace()
+    import pdb;pdb.set_trace()
+    for ix,i in enumerate(dataitemset):
+        print(i)
     
 
 if __name__ == '__main__':

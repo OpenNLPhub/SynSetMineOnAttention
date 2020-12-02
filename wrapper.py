@@ -92,7 +92,7 @@ class ModelWrapper(BaseWrapper):
             
             # using f1_score to update standard line
             if self.best_score < score:
-                self.best_model = score
+                self.best_score = score
                 self.best_model = deepcopy(self.model)
                 self.save_check_point()
                 logger.info("Update BEST MODEL !")

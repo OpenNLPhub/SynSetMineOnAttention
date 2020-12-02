@@ -55,7 +55,7 @@ DataConfig = {
 #default modelconfig
 ModelConfig = {
     'name' : 'SynSetMineOnBase',
-    'version' : 'v1.0.0',
+    'version' : 'v1.1.0',
     'attention_hidden_size': 256,
     'classifier_hidden_size': [512,256]
 }
