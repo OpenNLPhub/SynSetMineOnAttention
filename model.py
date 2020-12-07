@@ -222,7 +222,7 @@ class BinarySynClassifierBaseOnAttention(nn.Module):
 
         word_set_vec = self.mapper(word_set_vec)
         waiting_word = self.mapper(waiting_word)
-        
+
         com_feature = self.extract_feature(word_set_vec, waiting_word)
 
         ans = self.classifier(com_feature)
@@ -237,3 +237,24 @@ class BinarySynClassifierBaseOnAttention(nn.Module):
         ans = torch.cat([add_feature,divide_feature,multiply_feature,x,y], dim = -1)
         return ans
         
+    def test_predict_attention_weights(self,word_set:torch.Tensor,mask:torch.Tensor):
+        word_set = self.embedding(word_set)
+        word_set_weight = self.attention_unit(word_set, mask);
+        # [batch_size * word_nums] = [ 1 * max_word_nums]
+        return word_set_weight.squeeze(0)
+    
+    def test_predict_is_wordset(self,word_set:torch.Tensor, mask:torch.Tensor, waiting_word:torch.Tensor):
+        word_set_ = self.embedding(word_set)
+        waiting_word_ = self.embedding(waiting_word)
+
+        word_set_weight = self.attention_unit(word_set_, mask);
+        word_set_weight = word_set_weight.expand(-1,-1,word_set_.size(-1))
+        word_set_vec = torch.sum(word_set_weight * word_set_, dim = 1)
+        word_set_vec = self.mapper(word_set_vec)
+        waiting_word_ = self.mapper(waiting_word_)
+
+        com_feature = self.extract_feature(word_set_vec, waiting_word_)
+
+        ans = self.classifier(com_feature)
+        # batch_size , 1
+        return torch.sigmoid(ans).squeeze(-1)

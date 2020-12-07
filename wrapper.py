@@ -6,7 +6,8 @@
 @desc [description]
 '''
 
-from os import wait
+from model import Attention_layer
+from os import wait, write
 from pathlib import Path
 from dataloader import DataSet
 from datetime import datetime
@@ -226,5 +227,38 @@ class ModelWrapper(BaseWrapper):
         ans = []
         for func in function_list:
             ans.append(func(pred_cluster = pred_cluster,target_cluster = target_cluster))
+        self.writer.add_hparams(metric_dict={ name:f for name,f in ans})
+        
         return ans
+        
+    """
+    Below Methods are used to Test
+    """
+    def Test_predict_wordset_attention(self,word_set:List[str],word2id:Dict):
+        self.best_model.eval();
+        word_set_ = [ word2id[i] for i in word_set]
+        word_set_, attention_mask = set_padding([word_set_])
+        word_set_tensor = torch.tensor(word_set_).long().to(self.device)
+        attention_mask = torch.tensor(attention_mask).long().to(self.device)
+        attention_weight = self.best_model.test_predict_attention_weights(word_set_tensor, attention_mask)
+        attention_weight = attention_weight.cpu().detach().numpy()
+        d = {i:j for i,j in zip(word_set,attention_weight)}
+        return d
+    
+    def Test_predict_is_wordset(self,word_set:List[str],waiting_word:str,word2id:Dict):
+        self.best_model.eval();
+        word_set_ = [ word2id[i] for i in word_set]
+        waiting_word_ = word2id[waiting_word]
+        word_set_, attentionn_mask = set_padding([word_set_])
+        word_set_tensor = torch.tensor(word_set_).long().to(self.device)
+        attention_mask = torch.tensor(attentionn_mask).long().to(self.device)
+        waiting_word_tensor = torch.tensor([waiting_word_]).long().to(self.device)
+
+        y = self.best_model(word_set_tensor,attention_mask,waiting_word_tensor)
+        # batch_size , 1
+        y = y.squeeze(0).cpu().detach().numpy()
+        return y
+        
+        
+
     
