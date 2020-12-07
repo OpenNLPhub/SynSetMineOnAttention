@@ -4,6 +4,7 @@
  * @create date 2020-11-29 15:02:50
  * @desc BaseWrapper for model wrapper in deeplearning
 '''
+import pickle
 from typing import Any, Dict, Optional
 import typing as __t
 from pathlib import Path
@@ -22,7 +23,6 @@ class BaseWrapper(object):
             'loss_fn', 'checkpoint_epoch', 'print_step', 'batch_size', 'lr', 'checkpoint_dir', 'cuda',
             'optim', 'epoches'
             ]
-    
         F = lambda key: self.getconfigattr(key,config)
         
         self.model = model
@@ -74,7 +74,7 @@ class BaseWrapper(object):
     def test_performance_(self):
         raise NotImplementedError()
     
-
+    
     def save_check_point(self, filename:str = None, epoch:int = None) -> None:
         """ save the key attribute in this wrapper
         key attribute:
@@ -128,5 +128,35 @@ class BaseWrapper(object):
         self.best_model.load_state_dict(checkpoint['best_model'])
         self.optimizer.load_state_dict(checkpoint['optimizer'])
         self.best_score = checkpoint['best_score']
+    
 
- 
+    def save(self,dir_path:Path):
+        """ save this wrapper
+        using pickle to save this wrapper 
+        It is convinient for us to get entire wrapper without setting config
+        """
+        name = self.model.name
+        version = self.model.version
+        filename = name + "_" + version + "_wrapper.pkl" 
+        filepath = dir_path.joinpath(filename)
+        with open(filepath, 'wb') as f:
+            pickle.dump(self.__dict__, f)
+        
+    
+    @classmethod
+    def load(cls,dir_path:Path):
+        """ load this wrapper
+        using pickle to load this wrapper
+        It is convinient for us to get entire wrapper without setting config
+        """
+        # f = open(self.filename, 'rb')
+        # tmp_dict = cPickle.load(f)
+        # f.close()          
+
+        # self.__dict__.update(tmp_dict)
+        with open(dir_path, 'rb') as f:
+            tmp_dict = pickle.load(f)
+            return cls(tmp_dict['model'],tmp_dict)
+
+        
+        
