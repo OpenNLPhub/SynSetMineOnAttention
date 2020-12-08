@@ -57,6 +57,9 @@ class BaseWrapper(object):
                 return None
         return config[key]
 
+    def append_require_mode(self,key:str)->Any:
+        if key not in self.required_mode:
+            self.required_mode.append(key)
 
     def train(self,train_dataloader:BaseDataLoader, dev_dataloader:Optional[BaseDataLoader])->None:
         raise NotImplementedError()       

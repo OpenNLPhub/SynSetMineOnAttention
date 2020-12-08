@@ -20,6 +20,17 @@ NYT_DIR_PATH = Path.joinpath(cwd,'data','NYT')
 PubMed_DIR_PATH = Path.joinpath(cwd, 'data', 'PubMed')
 Wiki_DIR_PATH = Path.joinpath(cwd, 'data', 'Wiki')
 
+
+#Wrapper Dir config
+WRAPPER_DIR_PATH = cwd.joinpath('result','wrapper')
+
+#check point config
+CHECK_POINT_DIR_PATH = cwd.joinpath('checkpoint')
+
+#clustering result path
+RESULT_DIR_PATH = cwd.joinpath('result')
+
+
 """ ---------------- Own Config ----------- """
 #default training Config
 TrainingConfig = {
@@ -28,9 +39,9 @@ TrainingConfig = {
     'checkpoint_epoch' : 5,
     'print_step' : 15,
     'lr' : 1e-4,
-    'checkpoint_dir' : cwd.joinpath('checkpoint'),
+    'checkpoint_dir' : CHECK_POINT_DIR_PATH,
     'batch_size' : 32,
-    'result_out_dir' : cwd.joinpath('result'),
+    'result_out_dir' : RESULT_DIR_PATH,
     'cuda': 'cuda:0',
     'bert_freeze': False
 }
@@ -41,7 +52,8 @@ OperateConfig = {
     'train' : True,
     'test' : True,
     'predict' : True,
-    'eval_function':['ARI','NMI','FMI']
+    'eval_function':['ARI','NMI','FMI'],
+    'plot':True
 }
 
 #default dataconfig

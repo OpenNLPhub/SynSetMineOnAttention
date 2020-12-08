@@ -5,6 +5,7 @@
  * @desc 
 '''
 
+from pathlib import Path
 from typing import Dict, List
 import torch
 import torch.nn as nn
@@ -236,7 +237,7 @@ class BinarySynClassifierBaseOnAttention(nn.Module):
         # batch_size, word_vec_size
         ans = torch.cat([add_feature,divide_feature,multiply_feature,x,y], dim = -1)
         return ans
-        
+    
     def test_predict_attention_weights(self,word_set:torch.Tensor,mask:torch.Tensor):
         word_set = self.embedding(word_set)
         word_set_weight = self.attention_unit(word_set, mask);
@@ -258,3 +259,17 @@ class BinarySynClassifierBaseOnAttention(nn.Module):
         ans = self.classifier(com_feature)
         # batch_size , 1
         return torch.sigmoid(ans).squeeze(-1)
+    
+    def save(self,dir_path:Path):
+        
+        name = self.name
+        version = self.version
+        filename = name+ '_' + version + '.pkl'
+        dir_path.joinpath(filename)
+        
+        torch.save(self,str(dir_path))
+
+
+    @classmethod
+    def load(cls,path:Path):
+        return torch.load(str(path))

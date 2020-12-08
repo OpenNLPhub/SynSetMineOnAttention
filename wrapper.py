@@ -6,13 +6,11 @@
 @desc [description]
 '''
 
-from model import Attention_layer
-from os import wait, write
 from pathlib import Path
+
+from torch.utils.tensorboard.summary import hparams
 from dataloader import DataSet
 from datetime import datetime
-import typing as __t
-from numpy.lib.arraysetops import union1d
 import torch.nn as nn
 import torch
 from torch.utils.tensorboard import SummaryWriter
@@ -24,16 +22,16 @@ from evaluate import EvalUnit,binary_confusion_matrix_evaluate
 from base.basewrapper import BaseWrapper
 from base.basedataloader import BaseDataLoader
 from utils import set_padding
+import pickle
 
 class ModelWrapper(BaseWrapper):
     """Class to wrapper training and testing of deeplearning model
     """
     def __init__(self, model:nn.Module, config:Dict):
         super(ModelWrapper,self).__init__(model,config)
-        self.required_mode.append('threshold')
+        self.append_require_mode('threshold')
         self.threshold = self.getconfigattr('threshold',config=config)
-        
-        self.writer = SummaryWriter()
+
 
     def __check_before_work(self,keys:List[str]):
         for key in keys:
@@ -76,21 +74,19 @@ class ModelWrapper(BaseWrapper):
                     logger.info('Training Epoch: {} step {}/{} Loss:{:.6f}'.format(
                         epoch,step + 1,all_step,step_loss
                     ))
-            #Writer
-            self.writer.add_scalar('Loss/train',ep_loss/all_step,epoch)
             #Train Evaluation
             logger.info('Evaluation Training Epoch:{}'.format(epoch))
-
+            val_loss = 0.0
+            val_unit = EvalUnit(0,0,0,0,'validation')
             if validation_flag:
                 # it will update model in validation method
-                score = self.validation()
+                val_loss, val_unit = self.validation()
+                score = val_unit.f1_score()
             else:
                 #No Validation Model
                 #update best model according to performance in Trainning DataSet
                 score = epoch_unit.f1_score()
-            
-            self.writer.add_scalar('F1_score in Validation:',score,epoch)
-            
+                  
             # using f1_score to update standard line
             if self.best_score < score:
                 self.best_score = score
@@ -104,22 +100,38 @@ class ModelWrapper(BaseWrapper):
             if (epoch + 1) % self.checkpoint_epoch == 0 or epoch + 1 == self.epoches:
                 self.save_check_point(epoch=epoch)
 
+            yield  (
+                    ep_loss/all_step, 
+                    epoch_unit.accuracy(),
+                    epoch_unit.precision(),
+                    epoch_unit.recall(),
+                    epoch_unit.f1_score(),
+                    val_loss,
+                    val_unit.accuracy(),
+                    val_unit.precision(),
+                    val_unit.recall(),
+                    val_unit.f1_score(),
+                    self.best_score
+                    )
 
             
     def train(self,train_dataloader:BaseDataLoader, dev_dataloader:Optional[BaseDataLoader]):
         self.train_dataloader = train_dataloader
         self.dev_dataloader = dev_dataloader
-        self.train_()
+        for item in self.train_():
+            yield item
+
   
     def validation(self):
         self.model.eval()
         all_step = len(self.dev_dataloader)
         validation_unit = EvalUnit(0,0,0,0,'Evaluation')
-
+        loss = 0.0
         for step, item in enumerate(self.dev_dataloader):
             batch_word_set, attention_mask, waiting_word, labels , tensor_labels = self.__trans_np_to_tensor(item)
             pred_ans = self.model(batch_word_set, attention_mask, waiting_word)
             step_loss = self.loss_fn(pred_ans,tensor_labels) / tensor_labels.shape[0]
+            loss += step_loss.item()
             pred_labels = np.where(pred_ans.cpu().detach().numpy() > self.threshold,1,0)
             unit = binary_confusion_matrix_evaluate(np.array(labels), pred_labels)
             validation_unit += unit
@@ -129,7 +141,7 @@ class ModelWrapper(BaseWrapper):
 
         logger.info("Validation Evaluation:")
         logger.info(validation_unit)
-        return validation_unit.f1_score()
+        return loss/all_step, validation_unit
 
     def test_performance_(self):
         self.__check_before_work(['test_dataloader'])
@@ -150,6 +162,7 @@ class ModelWrapper(BaseWrapper):
     def test_performance(self,test_dataloader:BaseDataLoader):
         self.test_dataloader = test_dataloader
         self.test_performance_()
+
 
     def cluster_predict(self,dataset:DataSet,word2id:Dict,outputfile:Optional[Path]) -> Sequence[Any]:
         """Using Binary Classifer to cluster wordset
@@ -227,8 +240,6 @@ class ModelWrapper(BaseWrapper):
         ans = []
         for func in function_list:
             ans.append(func(pred_cluster = pred_cluster,target_cluster = target_cluster))
-        self.writer.add_hparams(metric_dict={ name:f for name,f in ans})
-        
         return ans
         
     """
@@ -258,7 +269,37 @@ class ModelWrapper(BaseWrapper):
         # batch_size , 1
         y = y.squeeze(0).cpu().detach().numpy()
         return y
-        
+
+
+    """ ---------------- OverWrite No Writer -----------------"""  
+    def save(self,dir_path:Path):
+        """ save this wrapper
+        using pickle to save this wrapper 
+        It is convinient for us to get entire wrapper without setting config
+        """
+        name = self.model.name
+        version = self.model.version
+        filename = name + "_" + version + "_wrapper.pkl" 
+        filepath = dir_path.joinpath(filename)
+        d = self.__dict__
+        with open(filepath, 'wb') as f:
+            pickle.dump(d, f)
+
+    
+    @classmethod
+    def load(cls,dir_path:Path):
+        """ load this wrapper
+        using pickle to load this wrapper
+        It is convinient for us to get entire wrapper without setting config
+        """
+        # f = open(self.filename, 'rb')
+        # tmp_dict = cPickle.load(f)
+        # f.close()          
+
+        # self.__dict__.update(tmp_dict)
+        with open(dir_path, 'rb') as f:
+            tmp_dict = pickle.load(f)
+            return cls(tmp_dict['model'],tmp_dict)
         
 
     
