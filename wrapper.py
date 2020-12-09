@@ -158,10 +158,12 @@ class ModelWrapper(BaseWrapper):
             test_unit += unit
         logger.info("Test Performance Evaluation:")
         logger.info(test_unit)
+        return test_unit.metrics2dict()
 
     def test_performance(self,test_dataloader:BaseDataLoader):
         self.test_dataloader = test_dataloader
-        self.test_performance_()
+        return self.test_performance_()
+
 
 
     def cluster_predict(self,dataset:DataSet,word2id:Dict,outputfile:Optional[Path]) -> Sequence[Any]:

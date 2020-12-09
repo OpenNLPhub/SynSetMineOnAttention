@@ -69,6 +69,15 @@ ModelConfig = {
     'name' : 'SynSetMineOnBase',
     'version' : 'v1.1.0',
     'attention_hidden_size': 256,
-    'classifier_hidden_size': [512,256]
+    'classifier_hidden_size': [512,256],
+    'mapper_hidden_size': [128,256],
+    'dropout': 0.5
 }
 
+
+register_hparams = {**ModelConfig, **TrainingConfig, **DataConfig}
+register_hparams.pop('checkpoint_dir')
+register_hparams.pop('result_out_dir')
+register_hparams.pop('data_dir_path')
+register_hparams['classifier_hidden_size'] = str(register_hparams['classifier_hidden_size'])
+register_hparams['mapper_hidden_size'] = str(register_hparams['mapper_hidden_size'])

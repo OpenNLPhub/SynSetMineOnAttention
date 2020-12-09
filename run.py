@@ -22,10 +22,12 @@ from utils import set_random_seed
 SEED = 2020
 
 def test_clustertask(operateconfig:Dict,dataconfig:Dict, trainingconfig:Dict, modelconfig:Dict):
-    hparams = {**trainingconfig, **dataconfig, **modelconfig}
+    #set registered hyper parameters
+    hparams = config.register_hparams
+
     dir_path =  dataconfig['data_dir_path']
     comment = '_' + dir_path.name +'_'+modelconfig['name']+'_'+modelconfig['version']
-
+    metric_dict = {}
     w = SummaryWriter(comment = comment) if operateconfig['plot'] else None
     
     if not dir_path:
@@ -101,8 +103,8 @@ def test_clustertask(operateconfig:Dict,dataconfig:Dict, trainingconfig:Dict, mo
                     word2id=datasetdir.word2id,
                     batch_size=trainingconfig['batch_size']
                 )
-        wrapper.test_performance(test_dataloader=test_dataloader)
-
+        d = wrapper.test_performance(test_dataloader=test_dataloader)
+        metric_dict = { **metric_dict, **d}
     if operateconfig['predict']:
         func_list = select_evaluate_func(operateconfig['eval_function'])
 
@@ -115,10 +117,12 @@ def test_clustertask(operateconfig:Dict,dataconfig:Dict, trainingconfig:Dict, mo
         ans = wrapper.evaluate(datasetdir.test_dataset, pred_word_set,function_list=func_list)
         logger.info("{} DataSet Cluster Prediction".format(datasetdir.train_dataset.name))
         for name,f in ans:
-            logger.info("{} : {:.2f}".format(name,f))
+            logger.info("{} : {:.5f}".format(name,f))
         
         if w:
-            w.add_hparams(hparams,ans)
+            d = {i:j for i,j in ans}
+            metric_dict = {**metric_dict, **d}
+            w.add_hparams(hparams, metric_dict = metric_dict)
             w.close()
     wrapper.save(config.WRAPPER_DIR_PATH)
 
