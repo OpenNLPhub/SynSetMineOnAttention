@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Dict, List
 import torch
 import torch.nn as nn
+from torch.nn.modules import dropout
 from transformers import BertModel
 from config import BertPretrainedModelPath
 import numpy as np
@@ -199,8 +200,8 @@ class BinarySynClassifierBaseOnAttention(nn.Module):
         self.version = config['version']
         self.embedding = config['embedding']
         self.attention_unit = config['attention']
-        self.classifier = getFCLayer([self.embedding.dim * 5, *config['classifier_hidden_size'], 1],True)
-        self.mapper = nn.Linear(self.embedding.dim, self.embedding.dim,bias=False)
+        self.classifier = getFCLayer([config['mapper_hidden_size'][-1] * 5, *config['classifier_hidden_size'], 1],True,dropout=config['dropout'])
+        self.mapper = getFCLayer([self.embedding.dim, *config['mapper_hidden_size']], True, dropout= config['dropout'])
     
     def forward(self,word_set:torch.Tensor,mask:torch.Tensor,waiting_word:torch.Tensor):
         """
