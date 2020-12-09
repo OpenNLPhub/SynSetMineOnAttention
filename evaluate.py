@@ -71,8 +71,15 @@ class EvalUnit(object):
         return float(self.tp) / (self.tp + self.fn) if (self.tp + self.fn) != 0 else 0.
 
     def metrics(self) -> Tuple[float]:
-        return (self.accuracy, self.precision, self.recall, self.f1_score)
-
+        return (self.accuracy(), self.precision(), self.recall(), self.f1_score())
+    
+    def metrics2dict(self) -> Dict:
+        return {
+                "Accuracy" : self.accuracy(),
+                "Precision" : self.precision(),
+                "Recall" : self.recall(),
+                "F1_score" : self.f1_score()
+                }
 
 def binary_confusion_matrix_evaluate(y_true:Sequence[Any], y_pred:Sequence[Any]) -> EvalUnit:
     # import pdb; pdb.set_trace()
