@@ -98,7 +98,7 @@ class BaseWrapper(object):
         
         filepath = Path.joinpath(dir_path, filename)
         d = {
-            'epoch':self.start_epoch,
+            'epoch':epoch,
             'state_dict' : self.model.state_dict(),
             'optimizer' : self.optimizer.state_dict(),
             'best_model' : self.best_model.state_dict(),
