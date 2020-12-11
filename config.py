@@ -35,7 +35,7 @@ RESULT_DIR_PATH = cwd.joinpath('result')
 #default training Config
 TrainingConfig = {
     'threshold' :  0.5,
-    'epoches' : 100,
+    'epoches' : 200,
     'checkpoint_epoch' : 5,
     'print_step' : 15,
     'lr' : 1e-4,
@@ -61,13 +61,14 @@ DataConfig = {
     'data_dir_path' : None,
     'sample_strategy' : 'sample_large_size_enumerate',
     'negative_sample_size' : 20,
-    'test_negative_sample_size' : 10
+    'test_negative_sample_size' : 10,
+    'word_emb_select': 'embed'
 }
 
 #default modelconfig
 ModelConfig = {
     'name' : 'SynSetMineOnBase',
-    'version' : 'v1.1.0',
+    'version' : 'v1.1.2',
     'attention_hidden_size': 256,
     'classifier_hidden_size': [512,256],
     'mapper_hidden_size': [128,256],

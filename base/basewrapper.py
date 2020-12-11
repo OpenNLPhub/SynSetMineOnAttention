@@ -13,6 +13,7 @@ import torch
 import torch.nn as nn
 import warnings
 from base.basedataloader import BaseDataLoader
+import os
 
 class BaseWrapper(object):
     """Base class for Wrapper
@@ -26,7 +27,8 @@ class BaseWrapper(object):
         F = lambda key: self.getconfigattr(key,config)
         
         self.model = model
-        self.device = torch.device(config['cuda']) if torch.cuda.is_available() else torch.device('cpu')
+        self.cuda = config['cuda']
+        self.device = torch.device(self.cuda) if torch.cuda.is_available() else torch.device('cpu')
         
         self.loss_fn = F('loss_fn')
         self.start_epoch = 0
@@ -138,10 +140,14 @@ class BaseWrapper(object):
         using pickle to save this wrapper 
         It is convinient for us to get entire wrapper without setting config
         """
-        name = self.model.name
-        version = self.model.version
-        filename = name + "_" + version + "_wrapper.pkl" 
-        filepath = dir_path.joinpath(filename)
+        if os.path.isdir(dir_path):
+            name = self.model.name
+            version = self.model.version
+            filename = name + "_" + version + "_wrapper.pkl" 
+            filepath = dir_path.joinpath(filename)
+        else:
+            filepath = dir_path
+
         with open(filepath, 'wb') as f:
             pickle.dump(self.__dict__, f)
         
@@ -157,6 +163,15 @@ class BaseWrapper(object):
         # f.close()          
 
         # self.__dict__.update(tmp_dict)
+        if os.path.isdir(dir_path):
+            flist = os.listdir(dir_path)
+            if not flist:
+                msg = 'No wrapper pickle file'
+                raise ValueError(msg=msg)
+            filepath = Path.joinpath(dir_path,max(flist))
+        if os.path.isfile(dir_path):
+            filepath = dir_path
+
         with open(dir_path, 'rb') as f:
             tmp_dict = pickle.load(f)
             return cls(tmp_dict['model'],tmp_dict)

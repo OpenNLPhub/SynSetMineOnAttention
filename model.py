@@ -187,6 +187,8 @@ class Attention_layer(nn.Module):
         #batch_size, max_seq_len, hidden_size
         att_output = self.dropout(att_output)
         att_output = self.normalize_kernel(att_output)
+        
+        att_output = torch.softmax(att_output,-1)
         #batch_size, max_seq_len, 1
         return att_output
 
@@ -202,7 +204,7 @@ class BinarySynClassifierBaseOnAttention(nn.Module):
         self.attention_unit = config['attention']
         self.classifier = getFCLayer([config['mapper_hidden_size'][-1] * 5, *config['classifier_hidden_size'], 1],True,dropout=config['dropout'])
         self.mapper = getFCLayer([self.embedding.dim, *config['mapper_hidden_size']], True, dropout= config['dropout'])
-    
+        #self.mapper.add_module('activate',nn.ReLU())
     def forward(self,word_set:torch.Tensor,mask:torch.Tensor,waiting_word:torch.Tensor):
         """
         @params:

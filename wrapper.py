@@ -7,13 +7,11 @@
 '''
 
 from pathlib import Path
-
-from torch.utils.tensorboard.summary import hparams
+import os
 from dataloader import DataSet
 from datetime import datetime
 import torch.nn as nn
 import torch
-from torch.utils.tensorboard import SummaryWriter
 import numpy as np
 from log import logger
 from typing import Any, Callable, Dict, List, Optional, Sequence
@@ -55,7 +53,7 @@ class ModelWrapper(BaseWrapper):
         validation_flag = True if self.dev_dataloader is not None else False
         for epoch in t:
             self.model.train()
-            epoch_unit = EvalUnit(0,0,0,0,'sum')
+            epoch_unit = EvalUnit(0,0,0,0,'Training')
             ep_loss = 0.0
             for step,item in enumerate(self.train_dataloader):
                 batch_word_set, attention_mask, waiting_word, labels , tensor_labels = self.__trans_np_to_tensor(item)
@@ -279,10 +277,14 @@ class ModelWrapper(BaseWrapper):
         using pickle to save this wrapper 
         It is convinient for us to get entire wrapper without setting config
         """
-        name = self.model.name
-        version = self.model.version
-        filename = name + "_" + version + "_wrapper.pkl" 
-        filepath = dir_path.joinpath(filename)
+        if os.path.isdir(dir_path):
+            name = self.model.name
+            version = self.model.version
+            filename = name + "_" + version +"_wrapper.pkl" 
+            filepath = dir_path.joinpath(filename)
+        else:
+            filepath = dir_path
+
         d = self.__dict__
         with open(filepath, 'wb') as f:
             pickle.dump(d, f)
@@ -299,6 +301,15 @@ class ModelWrapper(BaseWrapper):
         # f.close()          
 
         # self.__dict__.update(tmp_dict)
+        if os.path.isdir(dir_path):
+            flist = os.listdir(dir_path)
+            if not flist:
+                msg = 'No wrapper pickle file'
+                raise ValueError(msg=msg)
+            filepath = Path.joinpath(dir_path,max(flist))
+        if os.path.isfile(dir_path):
+            filepath = dir_path
+
         with open(dir_path, 'rb') as f:
             tmp_dict = pickle.load(f)
             return cls(tmp_dict['model'],tmp_dict)

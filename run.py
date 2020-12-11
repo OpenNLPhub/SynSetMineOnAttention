@@ -33,7 +33,7 @@ def test_clustertask(operateconfig:Dict,dataconfig:Dict, trainingconfig:Dict, mo
     if not dir_path:
         raise KeyError
 
-    datasetdir = DataSetDir(dir_path)
+    datasetdir = DataSetDir(dir_path,word_emb_select=dataconfig['word_emb_select'])
     # combine model
     embedding_layer = Embedding_layer.from_pretrained(datasetdir.embedding_vec)
     
@@ -82,7 +82,7 @@ def test_clustertask(operateconfig:Dict,dataconfig:Dict, trainingconfig:Dict, mo
                 w.add_scalar("Training/Loss", ep_loss ,ix)
                 w.add_scalar("Training/Accuracy", t_ac, ix )
                 w.add_scalar("Training/Precision", t_p, ix)
-                w.add_scalar("Training/Recall", t_p, ix)
+                w.add_scalar("Training/Recall", t_r, ix)
                 w.add_scalar("Training/F1_score", t_f1, ix)
                 w.add_scalar("Validation/Loss",v_loss, ix)
                 w.add_scalar("Validation/Accuracy", v_ac, ix)
@@ -105,6 +105,7 @@ def test_clustertask(operateconfig:Dict,dataconfig:Dict, trainingconfig:Dict, mo
                 )
         d = wrapper.test_performance(test_dataloader=test_dataloader)
         metric_dict = { **metric_dict, **d}
+    
     if operateconfig['predict']:
         func_list = select_evaluate_func(operateconfig['eval_function'])
 
@@ -124,7 +125,7 @@ def test_clustertask(operateconfig:Dict,dataconfig:Dict, trainingconfig:Dict, mo
             metric_dict = {**metric_dict, **d}
             w.add_hparams(hparams, metric_dict = metric_dict)
             w.close()
-    wrapper.save(config.WRAPPER_DIR_PATH)
+    wrapper.save(config.WRAPPER_DIR_PATH.joinpath(datasetdir.name))
 
 def NYT():
     DataConfig['data_dir_path'] = config.NYT_DIR_PATH
