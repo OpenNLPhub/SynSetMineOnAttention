@@ -35,7 +35,7 @@ RESULT_DIR_PATH = cwd.joinpath('result')
 #default training Config
 TrainingConfig = {
     'threshold' :  0.5,
-    'epoches' : 200,
+    'epoches' : 100,
     'checkpoint_epoch' : 5,
     'print_step' : 15,
     'lr' : 1e-4,
@@ -52,8 +52,7 @@ OperateConfig = {
     'train' : True,
     'test' : True,
     'predict' : True,
-    'eval_function':['ARI','NMI','FMI'],
-    'plot':True
+    'plot': True
 }
 
 #default dataconfig

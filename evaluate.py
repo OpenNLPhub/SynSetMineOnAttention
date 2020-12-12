@@ -36,7 +36,7 @@ class EvalUnit(object):
         desc += 'True Positive:{} \nTrue Negative:{} \nFalse Positive:{} \nFalse Negative:{} \n'.format(
                 self.tp, self.tn, self.fp, self.fn
                 )
-        desc += 'Accuracy:{:.2f} \nPrecision:{:.2f} \nRecall:{:.2f} \nF1-Score:{:.2f}'.format(
+        desc += 'Accuracy:{:.4f} \nPrecision:{:.4f} \nRecall:{:.4f} \nF1-Score:{:.4f}'.format(
                 self.accuracy(), self.precision(), self.recall(), self.f1_score()
                 )
         return desc
@@ -257,19 +257,14 @@ def metrics_fowlkes_mallows_score(pred_cluster:Dict, target_cluster:Dict) ->Any:
     pred_sequence,target_sequence = helper_trans_to_labelsequence(pred_cluster,target_cluster)
     return 'FMI', sklearn.metrics.fowlkes_mallows_score(labels_true = target_sequence, labels_pred = pred_sequence)
 
-#through config to add function list
-def select_evaluate_func(select:Sequence[str]) -> Any:
-    func_list = []
-    for i in select:
-        if i == 'ARI':
-            func_list.append(metrics_adjusted_randn_index)
-        elif i == 'NMI':
-            func_list.append(metrics_normalized_mutual_info_score)
-        elif i == 'FMI':
-            func_list.append(metrics_fowlkes_mallows_score)
-        else:
-            raise KeyError
-    return func_list
+
+def cluster_metrics_eval(pred_cluster:Dict, target_cluster:Dict)->Sequence[Any]:
+    pred_sequence,target_sequence = helper_trans_to_labelsequence(pred_cluster,target_cluster)
+    return {
+        ('ARI', sklearn.metrics.adjusted_rand_score(labels_true = target_sequence, labels_pred = pred_sequence)),
+        ('NMI', sklearn.metrics.normalized_mutual_info_score(labels_true = target_sequence, labels_pred = pred_sequence)),
+        ('FMI', sklearn.metrics.fowlkes_mallows_score(labels_true = target_sequence, labels_pred = pred_sequence))
+    }
 
 if __name__ == '__main__':
     print(1)

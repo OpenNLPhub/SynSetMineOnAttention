@@ -13,7 +13,6 @@ from torch.utils.tensorboard.summary import hparams
 from dataloader import DataSetDir, DataSet, Dataloader, DataItemSet,select_sampler
 from wrapper import ModelWrapper
 from model import Embedding_layer, Attention_layer, BinarySynClassifierBaseOnAttention
-from evaluate import select_evaluate_func
 import config 
 from config import TrainingConfig,OperateConfig,DataConfig,ModelConfig
 from log import logger
@@ -77,7 +76,7 @@ def test_clustertask(operateconfig:Dict,dataconfig:Dict, trainingconfig:Dict, mo
         
         #Plot in Tensorboard
         for ix,item in enumerate(wrapper.train(train_dataloader=train_dataloader,dev_dataloader=dev_dataloader)):
-            ep_loss, t_ac, t_p, t_r, t_f1, v_loss, v_ac, v_p, v_r, v_f1, b_score = item
+            ep_loss, t_ac, t_p, t_r, t_f1, v_loss, v_ac, v_p, v_r, v_f1, cluster_unit, b_score = item
             if w:
                 w.add_scalar("Training/Loss", ep_loss ,ix)
                 w.add_scalar("Training/Accuracy", t_ac, ix )
@@ -89,6 +88,9 @@ def test_clustertask(operateconfig:Dict,dataconfig:Dict, trainingconfig:Dict, mo
                 w.add_scalar("Validation/Precision", v_p, ix)
                 w.add_scalar("Validation/Recall", v_r, ix)
                 w.add_scalar("Validation/F1_score", v_f1, ix)
+                w.add_scalar("Validation/FMI", cluster_unit['FMI'], ix)
+                w.add_scalar("Validation/ARI",  cluster_unit['ARI'], ix)
+                w.add_scalar("Validation/NMI",cluster_unit['NMI'], ix)
                 w.add_scalar("Best Score Update", b_score, ix)
         
     if operateconfig['test']:
@@ -107,15 +109,13 @@ def test_clustertask(operateconfig:Dict,dataconfig:Dict, trainingconfig:Dict, mo
         metric_dict = { **metric_dict, **d}
     
     if operateconfig['predict']:
-        func_list = select_evaluate_func(operateconfig['eval_function'])
-
         pred_word_set = wrapper.cluster_predict(
                     dataset=datasetdir.test_dataset,
                     word2id=datasetdir.word2id,
                     outputfile=trainingconfig['result_out_dir'].joinpath(datasetdir.name+'_result.txt')
                 )
 
-        ans = wrapper.evaluate(datasetdir.test_dataset, pred_word_set,function_list=func_list)
+        ans = wrapper.evaluate(datasetdir.test_dataset, pred_word_set)
         logger.info("{} DataSet Cluster Prediction".format(datasetdir.train_dataset.name))
         for name,f in ans:
             logger.info("{} : {:.5f}".format(name,f))

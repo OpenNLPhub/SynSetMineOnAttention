@@ -199,8 +199,8 @@ class BinarySynClassifierBaseOnAttention(nn.Module):
     def __init__(self,config:Dict):
         super(BinarySynClassifierBaseOnAttention,self).__init__()
         self.name = config['name']
-        self.version = config['version']
         self.embedding = config['embedding']
+        self.version = config['version']
         self.attention_unit = config['attention']
         self.classifier = getFCLayer([config['mapper_hidden_size'][-1] * 5, *config['classifier_hidden_size'], 1],True,dropout=config['dropout'])
         self.mapper = getFCLayer([self.embedding.dim, *config['mapper_hidden_size']], True, dropout= config['dropout'])
