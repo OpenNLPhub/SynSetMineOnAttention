@@ -17,7 +17,10 @@ import config
 from config import TrainingConfig,OperateConfig,DataConfig,ModelConfig
 from log import logger
 from utils import set_random_seed
-
+import argparse
+parser = argparse.ArgumentParser(description="Process some Command")
+parser.add_argument('--p', type=int, default= 1 ,help='is plot')
+args = parser.parse_args()
 SEED = 2020
 
 def test_clustertask(operateconfig:Dict,dataconfig:Dict, trainingconfig:Dict, modelconfig:Dict):
@@ -27,8 +30,7 @@ def test_clustertask(operateconfig:Dict,dataconfig:Dict, trainingconfig:Dict, mo
     dir_path =  dataconfig['data_dir_path']
     comment = '_' + dir_path.name +'_'+modelconfig['name']+'_'+modelconfig['version']
     metric_dict = {}
-    w = SummaryWriter(comment = comment) if operateconfig['plot'] else None
-    
+    w = SummaryWriter(comment = comment) if args.p else None
     if not dir_path:
         raise KeyError
 

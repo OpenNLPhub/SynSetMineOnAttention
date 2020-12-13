@@ -52,7 +52,6 @@ OperateConfig = {
     'train' : True,
     'test' : True,
     'predict' : True,
-    'plot': True
 }
 
 #default dataconfig
