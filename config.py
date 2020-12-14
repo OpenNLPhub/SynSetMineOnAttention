@@ -57,7 +57,7 @@ OperateConfig = {
 #default dataconfig
 DataConfig = {
     'data_dir_path' : None,
-    'sample_strategy' : 'sample_large_size_enumerate',
+    'sample_strategy' : 'sample_enumerate_size_enumerate',
     'negative_sample_size' : 20,
     'test_negative_sample_size' : 10,
     'word_emb_select': 'embed'
@@ -67,9 +67,9 @@ DataConfig = {
 ModelConfig = {
     'name' : 'SynSetMineOnBase',
     'version' : 'v1.1.2',
-    'attention_hidden_size': 256,
-    'classifier_hidden_size': [512,256],
-    'mapper_hidden_size': [128,256],
+    'attention_hidden_size': 512,
+    'classifier_hidden_size': [1024,256],
+    'mapper_hidden_size': [256,512],
     'dropout': 0.5
 }
 
