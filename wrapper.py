@@ -83,7 +83,7 @@ class ModelWrapper(BaseWrapper):
             if validation_flag:
                 # it will update model in validation method
                 val_loss, val_unit = self.validation()
-                if epoch > self.epoches / 5:
+                if epoch > self.epoches / 20:
                     cluster_unit = self.validation_cluster_metrics()
                     score = cluster_unit['NMI']
             else:
@@ -296,7 +296,7 @@ class ModelWrapper(BaseWrapper):
         attention_mask = torch.tensor(attention_mask).long().to(self.device)
         attention_weight = self.best_model.test_predict_attention_weights(word_set_tensor, attention_mask)
         attention_weight = attention_weight.cpu().detach().numpy()
-        d = {i:j for i,j in zip(word_set,attention_weight)}
+        d = {i:j.item() for i,j in zip(word_set,attention_weight)}
         return d
     
     def Test_predict_is_wordset(self,word_set:List[str],waiting_word:str,word2id:Dict):
