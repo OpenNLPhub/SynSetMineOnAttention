@@ -202,6 +202,8 @@ class BinarySynClassifierBaseOnAttention(nn.Module):
         self.embedding = config['embedding']
         self.version = config['version']
         self.attention_unit = config['attention']
+        # self.attention_unit = nn.MultiheadAttention(config['attention_hidden_size'],1,dropout=0.2)
+        # self.attention_normalize = nn.Linear(config['attention_hidden_size'],1,bias=True)
         self.classifier = getFCLayer([config['mapper_hidden_size'][-1] * 5, *config['classifier_hidden_size'], 1],True,dropout=config['dropout'])
         self.mapper = getFCLayer([self.embedding.dim, *config['mapper_hidden_size']], True, dropout= config['dropout'])
         #self.mapper.add_module('activate',nn.ReLU())
@@ -276,3 +278,58 @@ class BinarySynClassifierBaseOnAttention(nn.Module):
     @classmethod
     def load(cls,path:Path):
         return torch.load(str(path))
+
+
+"""Based On Transformer and Reading Comprehension"""
+class BinarySynClassifierBaseOnTransformer(nn.Module):
+    """SynSet Based On Transformer"""
+
+    def __init__(self,config:Dict):
+        super(BinarySynClassifierBaseOnAttention, self).__init__()
+        self.name = config['name']
+        self.embedding = config['embedding']
+        self.version = config['version']
+        self.hidden_state = config['hidden_state']
+        self.mapper = nn.Linear(self.embedding.dim)
+        self.encoder = TransformerUnit(config['d_model'], dim_feedforward=config['dim_feedforward'])
+        self.decoder = TransformerUnit(config['d_model'], dim_feedforward=config['dim_feedforward'])
+        
+        
+class TransformerUnit(nn.Module):
+    """Transformer Unit"""
+
+    def __init__(self, d_model:int, nhead:int, dim_feedforward:int = 2084, 
+        dropout:float = 0.2, activation:str = "relu"):
+        super(TransformerUnit, self).__init__()
+        self.attn = nn.MultiheadAttention(d_model, nhead, dropout=dropout)
+        self.linear1 = nn.Linear(d_model, dim_feedforward)
+        self.dropout =  nn.Dropout(dropout)
+        self.linear2 = nn.Linear(dim_feedforward, d_model)
+
+        self.norm1 = nn.LayerNorm(d_model)
+        self.norm2 = nn.LayerNorm(d_model)
+        self.dropout1 = nn.Dropout(dropout)
+        self.dropout2 = nn.Dropout(dropout)
+
+        self.activation = nn.ReLU()
+
+    def forward(self,query: torch.Tensor, 
+            key: torch.Tensor, 
+            value: torch.Tensor, 
+            attn_mask: torch.Tensor):
+        src = value
+
+        src2 = self.attn(query, key, value, attn_mask = attn_mask)[0]
+
+        src = src + self.dropout1(src2)
+
+        src = self.norm1(src)
+
+        src2 = self.linear2(self.dropout(self.activation(self.linear1(src))))
+        
+        src = src + self.dropout2(src2)
+
+        src = self.norm2(src)
+
+        return src
+        
