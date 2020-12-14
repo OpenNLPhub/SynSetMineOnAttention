@@ -19,6 +19,7 @@ from torch.utils import data
 from utils import set_padding
 import pickle
 from base.basedataloader import BaseDataLoader
+from itertools import combinations
 pattern = "(?<=\')[^\|\']*\|\|[^\|\']*?(?=\')"
 
 
@@ -193,14 +194,12 @@ class Sample_size_repeat_size(DataItemSampler):
         return ans,subset_size, pos_item_nums, neg_item_nums
 
 
-class Smaple_large_size_enumerate(DataItemSampler):
-    """A sample method to sample dataitem: for oen original word set,
-       if size of this word set is more than 2, enunmerate subword size 2 to wordset -1
-       if size of this word set is less than 2, ignore this word set
+class Sample_enumerate_size_enumerate(DataItemSampler):
+    """A sample method to sample dataitem : For one original word set, enunmerate all subset size and get item
     """
     def __init__(self) -> None:
-        super(Smaple_large_size_enumerate,self).__init__()
-    
+        super(Sample_enumerate_size_enumerate,self).__init__()
+
     def sample(self, wordpool:Dict, wordset: List[str], negative_sample_size:int) -> Tuple[List[Tuple],int]:
         ans = []
         setsize = len(wordset)
@@ -215,6 +214,50 @@ class Smaple_large_size_enumerate(DataItemSampler):
                 (pos_word, neg_word, 0)
             ]
             return ans, 1.0, 1, 1
+        sub_word_set_range = range(2,setsize+1) if setsize > 2 else range(1,setsize)
+        pos_item_nums = 0
+        neg_item_nums = 0
+        ave_subset_size = 0.0
+        for subwordsetsize in sub_word_set_range:
+            wordsetGeneration = combinations(wordset,subwordsetsize)
+            for subwordset in wordsetGeneration:
+            # subwordset = [wordset[ix] for ix in word_index]
+            #pos_data item
+                waiting_word_set = [ word for word in wordset if word not in subwordset]
+                pos_word = random.choice(wordset) if len(waiting_word_set) == 0 else random.choice(waiting_word_set)
+                ans.append((subwordset, pos_word, 1))
+                neg_words = self._negative_sample(wordpool,wordset,negative_sample_size)
+                for neg_word in neg_words:
+                    ans.append((subwordset, neg_word,0))
+                pos_item_nums += 1
+                neg_item_nums += negative_sample_size
+                ave_subset_size += subwordsetsize    
+        return ans, ave_subset_size/(setsize - 1), pos_item_nums, neg_item_nums
+            
+class Smaple_large_size_enumerate(DataItemSampler):
+    """A sample method to sample dataitem: for oen original word set,
+       if size of this word set is more than 2, enunmerate subword size 2 to wordset -1
+       if size of this word set is less than 2, ignore this word set
+    """
+    def __init__(self) -> None:
+        super(Smaple_large_size_enumerate,self).__init__()
+
+    def sample(self, wordpool: Dict, wordset: List[str], negative_sample_size:int) -> Tuple[List[Tuple],int]:
+        """c"""
+        ans = []
+        setsize = len(wordset)
+
+        if setsize == 1:
+            pos_word = wordset[0]
+            neg_word = random.choice(list(wordpool.keys()))
+            while neg_word == pos_word:
+                neg_word = random.choice(list(wordpool.keys()))
+            ans = [
+                (pos_word, pos_word, 1),
+                (pos_word, neg_word, 0)
+            ]
+            return ans, 1.0, 1, 1
+        
         sub_word_set_range = range(2,setsize+1) if setsize > 2 else range(1,setsize)
         pos_item_nums = 0
         neg_item_nums = 0
@@ -239,22 +282,11 @@ class Smaple_large_size_enumerate(DataItemSampler):
             
 
 
-class Sample_vary_size_enumerate(DataItemSampler):
-    """A sample method to sample dataitem : For one original word set, enunmerate all subset size and get item
-    """
-    def __init__(self) -> None:
-        super(Sample_vary_size_enumerate,self).__init__()
-
-    def sample(self, wordpool: Dict, wordset: List[str], negative_sample_size:int) -> Tuple[List[Tuple],int]:
-        """c"""
-        pass
-
-
 
 
 def select_sampler(name:str)-> DataItemSampler:
-    if name == "sample_vary_size_enumerate":
-        return Sample_vary_size_enumerate()
+    if name == "sample_enumerate_size_enumerate":
+        return Sample_enumerate_size_enumerate()
     elif name == "sample_size_repeat_size":
         return Sample_size_repeat_size()
     elif name == "sample_large_size_enumerate":
@@ -370,7 +402,7 @@ def test_dataloader():
     cwd = Path.cwd()
     NYT = cwd.joinpath('data','NYT')
     datasetdir = DataSetDir(NYT)
-    sampler = select_sampler('sample_large_size_enumerate')
+    sampler = select_sampler('sample_enumerate_size_enumerate')
     dataitemset = DataItemSet(datasetdir.train_dataset,sampler,5)
     print(dataitemset)
     
@@ -385,7 +417,6 @@ def test_dataloader():
     for ix,i in enumerate(dataitemset):
         print(i)
     
-
 if __name__ == '__main__':
     test_dataloader()
 
