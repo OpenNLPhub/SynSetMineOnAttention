@@ -9,17 +9,14 @@
 
 from pathlib import Path
 import random
-import re
-from re import sub
 from typing import Dict, List, Optional, Set, Tuple, Any
 from copy import copy
 import numpy as np
-from numpy.core.defchararray import index
-from torch.utils import data
 from utils import set_padding
 import pickle
 from base.basedataloader import BaseDataLoader
 from itertools import combinations
+from tqdm import tqdm
 pattern = "(?<=\')[^\|\']*\|\|[^\|\']*?(?=\')"
 
 
@@ -71,7 +68,7 @@ class DataSetDir(object):
         word2id['SEP'] = 3
         word2id['SPLIT'] = 4
         embed_matrix = [[0]*dim_size,[0]*dim_size,[0]*dim_size,[0]*dim_size,[0]*dim_size]
-        for idx,line in enumerate(lines[1:]):
+        for idx,line in tqdm(enumerate(lines[1:])):
             t = line.strip()
             word, t = t.split('||')
             t = t.split(' ')
@@ -321,7 +318,7 @@ class DataItemSet(object):
         neg_item_num = 0
         pos_item_num = 0
 
-        for wordset in dataset:
+        for wordset in tqdm(dataset):
             subitems, subset_size, pos_item_size, neg_item_size = self.sampler.sample(self.vocab,wordset,self.negative_sample_size)
 
             neg_item_num += neg_item_size

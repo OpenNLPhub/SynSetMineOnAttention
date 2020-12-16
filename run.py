@@ -23,6 +23,7 @@ SEED = 2020
 
 def test_clustertask(operateconfig:Dict,dataconfig:Dict, trainingconfig:Dict, modelconfig:Dict):
     #set registered hyper parameters
+    logger.info("Register Hyper Parameter")
     hparams = generate_register_hparams(modelconfig,trainingconfig,dataconfig)
 
     dir_path =  dataconfig['data_dir_path']
@@ -31,7 +32,7 @@ def test_clustertask(operateconfig:Dict,dataconfig:Dict, trainingconfig:Dict, mo
     w = SummaryWriter(comment = comment) if args.p else None
     if not dir_path:
         raise KeyError
-
+    logger.info("Load Embedding Vector")
     datasetdir = DataSetDir(dir_path,word_emb_select=dataconfig['word_emb_select'])
     # combine model
     embedding_layer = Embedding_layer.from_pretrained(datasetdir.embedding_vec)
@@ -53,6 +54,7 @@ def test_clustertask(operateconfig:Dict,dataconfig:Dict, trainingconfig:Dict, mo
         # continue to trainning
 
     if operateconfig['train']:
+        logger.info("Generate DataLoader")
         train_datasetitem = DataItemSet(
                     dataset=datasetdir.train_dataset,
                     sampler = select_sampler(dataconfig['sample_strategy']),
@@ -73,7 +75,8 @@ def test_clustertask(operateconfig:Dict,dataconfig:Dict, trainingconfig:Dict, mo
                     word2id=datasetdir.word2id,
                     batch_size=trainingconfig['batch_size']
                 )
-        
+        logger.info("Start to Train !! ")
+
         #Plot in Tensorboard
         for ix,item in enumerate(wrapper.train(train_dataloader=train_dataloader,dev_dataloader=dev_dataloader)):
             ep_loss, t_ac, t_p, t_r, t_f1, v_loss, v_ac, v_p, v_r, v_f1, cluster_unit, b_score = item
@@ -114,7 +117,6 @@ def test_clustertask(operateconfig:Dict,dataconfig:Dict, trainingconfig:Dict, mo
                     word2id=datasetdir.word2id,
                     outputfile=trainingconfig['result_out_dir'].joinpath(datasetdir.name+'_result.txt')
                 )
-
         ans = wrapper.evaluate(datasetdir.test_dataset, pred_word_set)
         logger.info("{} DataSet Cluster Prediction".format(datasetdir.train_dataset.name))
         for name,f in ans:
@@ -154,8 +156,8 @@ def OMaha():
     DataConfig['data_dir_path'] = config.OMaha_DIR_PATH
     DataConfig['sample_strategy'] = 'sample_size_repeat_size'
     ModelConfig['attention_hidden_size'] = 768
-    ModelConfig['classifier_hidden_size'] = [4096, 1024]
-    ModelConfig['mapper_hidden_size'] = [1024, 4096]
+    ModelConfig['classifier_hidden_size'] = [2048, 512]
+    ModelConfig['mapper_hidden_size'] = [1024, 2048]
     ModelConfig['dropout'] = 0.3
     TrainingConfig['epoches'] = 200
     TrainingConfig['lr'] = 1e-5
