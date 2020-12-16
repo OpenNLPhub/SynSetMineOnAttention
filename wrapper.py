@@ -83,9 +83,9 @@ class ModelWrapper(BaseWrapper):
             if validation_flag:
                 # it will update model in validation method
                 val_loss, val_unit = self.validation()
-                if epoch > self.epoches / 20:
+                if epoch > self.epoches / 10:
                     cluster_unit = self.validation_cluster_metrics()
-                    score = cluster_unit['NMI']
+                    score = cluster_unit['ARI']
             else:
                 #No Validation Model
                 #update best model according to performance in Trainning DataSet

@@ -4,7 +4,8 @@
  * @create date 2020-11-10 16:24:54
  * @desc 
 '''
-import os 
+import os
+from typing import Dict 
 pwd = os.getcwd()
 bertroot = os.path.join(pwd,'static')
 BertPretrainedModelPath = {
@@ -19,6 +20,8 @@ cwd = Path.cwd()
 NYT_DIR_PATH = Path.joinpath(cwd,'data','NYT')
 PubMed_DIR_PATH = Path.joinpath(cwd, 'data', 'PubMed')
 Wiki_DIR_PATH = Path.joinpath(cwd, 'data', 'Wiki')
+OMaha_DIR_PATH = Path.joinpath(cwd, 'data', 'OMaha')
+CSKB_DIR_PATH = Path.joinpath(cwd, 'data', 'CSKB')
 
 
 #Wrapper Dir config
@@ -57,7 +60,7 @@ OperateConfig = {
 #default dataconfig
 DataConfig = {
     'data_dir_path' : None,
-    'sample_strategy' : 'sample_enumerate_size_enumerate',
+    'sample_strategy' : 'sample_large_size_enumerate',
     'negative_sample_size' : 20,
     'test_negative_sample_size' : 10,
     'word_emb_select': 'embed'
@@ -74,9 +77,11 @@ ModelConfig = {
 }
 
 
-register_hparams = {**ModelConfig, **TrainingConfig, **DataConfig}
-register_hparams.pop('checkpoint_dir')
-register_hparams.pop('result_out_dir')
-register_hparams.pop('data_dir_path')
-register_hparams['classifier_hidden_size'] = str(register_hparams['classifier_hidden_size'])
-register_hparams['mapper_hidden_size'] = str(register_hparams['mapper_hidden_size'])
+def generate_register_hparams(modelconfig:Dict, trainingconfig:Dict, dataconfig:Dict):
+    register_hparams = { **modelconfig, **trainingconfig, **dataconfig } 
+    register_hparams.pop('checkpoint_dir')
+    register_hparams.pop('result_out_dir')
+    register_hparams.pop('data_dir_path')
+    register_hparams['classifier_hidden_size'] = str(register_hparams['classifier_hidden_size'])
+    register_hparams['mapper_hidden_size'] = str(register_hparams['mapper_hidden_size'])
+    return register_hparams

@@ -9,23 +9,21 @@ from typing import Any,Dict
 import torch
 from torch.utils.tensorboard import SummaryWriter
 import torch.optim as optim
-from torch.utils.tensorboard.summary import hparams
 from dataloader import DataSetDir, DataSet, Dataloader, DataItemSet,select_sampler
 from wrapper import ModelWrapper
 from model import Embedding_layer, Attention_layer, BinarySynClassifierBaseOnAttention
 import config 
-from config import TrainingConfig,OperateConfig,DataConfig,ModelConfig
+from config import TrainingConfig,OperateConfig,DataConfig,ModelConfig,generate_register_hparams
 from log import logger
 from utils import set_random_seed
-import argparse
-parser = argparse.ArgumentParser(description="Process some Command")
-parser.add_argument('--p', type=int, default= 1 ,help='is plot')
+from args import parser
+
 args = parser.parse_args()
 SEED = 2020
 
 def test_clustertask(operateconfig:Dict,dataconfig:Dict, trainingconfig:Dict, modelconfig:Dict):
     #set registered hyper parameters
-    hparams = config.register_hparams
+    hparams = generate_register_hparams(modelconfig,trainingconfig,dataconfig)
 
     dir_path =  dataconfig['data_dir_path']
     comment = '_' + dir_path.name +'_'+modelconfig['name']+'_'+modelconfig['version']
@@ -141,8 +139,42 @@ def Wiki():
     DataConfig['data_dir_path'] = config.Wiki_DIR_PATH
     test_clustertask(OperateConfig,DataConfig,TrainingConfig,ModelConfig)
 
-if __name__ == '__main__':
+def CSKB():
+    DataConfig['data_dir_path'] = config.CSKB_DIR_PATH
+    ModelConfig['attention_hidden_size'] = 768
+    ModelConfig['classifier_hidden_size'] = [4096, 1024]
+    ModelConfig['mapper_hidden_size'] = [1024, 4096]
+    ModelConfig['dropout'] = 0.3
+    TrainingConfig['epoches'] = 500
+    TrainingConfig['lr'] = 1e-5
+    test_clustertask(OperateConfig, DataConfig, TrainingConfig, ModelConfig)
+
+
+def OMaha():
+    DataConfig['data_dir_path'] = config.OMaha_DIR_PATH
+    DataConfig['sample_strategy'] = 'sample_size_repeat_size'
+    ModelConfig['attention_hidden_size'] = 768
+    ModelConfig['classifier_hidden_size'] = [4096, 1024]
+    ModelConfig['mapper_hidden_size'] = [1024, 4096]
+    ModelConfig['dropout'] = 0.3
+    TrainingConfig['epoches'] = 200
+    TrainingConfig['lr'] = 1e-5
+    test_clustertask(OperateConfig, DataConfig, TrainingConfig, ModelConfig)
+
+def run():
     set_random_seed(seed=SEED)
-    NYT()
-    #PubMed()
-    #Wiki()
+    if args.dataset == 'NYT':
+        NYT()
+    elif args.dataset == 'PubMed':
+        PubMed()
+    elif args.dataset == 'Wiki':
+        Wiki()
+    elif args.dataset == 'CSKB':
+        CSKB()
+    elif args.dataset == 'OMaha':
+        OMaha()
+    else:
+        raise KeyError
+
+if __name__ == '__main__':
+    run()
