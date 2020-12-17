@@ -12,7 +12,7 @@ import random
 from typing import Dict, List, Optional, Set, Tuple, Any
 from copy import copy
 import numpy as np
-from utils import set_padding
+from utils import set_padding, set_padding_len
 import pickle
 from base.basedataloader import BaseDataLoader
 from itertools import combinations
@@ -292,6 +292,7 @@ def select_sampler(name:str)-> DataItemSampler:
     else:
         raise KeyError
 
+
 class DataItemSet(object):
     """DataItemSet  Generate Training and Testing data item"""
     def __init__(self, dataset:DataSet, sampler:DataItemSampler, negative_sample_size:int = 10)->None:
@@ -378,7 +379,7 @@ class Dataloader(BaseDataLoader):
     def __iter__(self):
         ixs = list(range(0,len(self.data)))
         random.shuffle(ixs)
-        batch_word_set, batch_waiting_word, batch_label, = [], [], []
+        batch_word_set, batch_waiting_word, batch_label = [], [], []
         for index,ix in enumerate(ixs):
             word_set, waiting_word, label = self.data[ix]
             word_id_set = [ self.word2id[word] for word in word_set]
@@ -392,6 +393,49 @@ class Dataloader(BaseDataLoader):
                 yield batch_word_set_, attention_mask, batch_waiting_word, batch_label
                 batch_word_set, batch_waiting_word, batch_label, = [], [], []
 
+
+class DataloaderTransformer(object):
+    """Dataloader to get batch size dataitem"""
+    def __init__(self, dataitems:DataItemSet, word2id, batch_size:int) -> None:
+        self.data = dataitems
+        self.l = len(self.data)//batch_size if len(self.data)%batch_size == 0 else len(self.data)//batch_size + 1
+        self.batch_size = batch_size
+        self.word2id = word2id
+
+    def __len__(self):
+        return self.l
+
+    def __iter__(self):
+        ixs = list(range(0,len(self.data)))
+        random.shuffle(ixs)
+        batch_old_word_set, batch_new_word_set, batch_label, batch_attention_pos = [], [], [], []
+        # import pdb;pdb.set_trace()
+        for index,ix in enumerate(ixs):
+            word_set, waiting_word, label = self.data[ix] 
+            word_id_set = [ self.word2id[word] for word in word_set]
+            waiting_word_id = self.word2id[waiting_word]
+            new_word_id_set = word_id_set.copy()
+            new_word_id_set.append(waiting_word_id)
+            
+            batch_old_word_set.append(word_id_set)
+            batch_new_word_set.append(new_word_id_set)
+            batch_label.append(label)
+            if label == 1:
+                attention_pos = [0] * len(word_id_set)
+                attention_pos.append(1)
+            else:
+                attention_pos = [0] * len(new_word_id_set)
+            
+            batch_attention_pos.append(attention_pos)
+            
+            if (index+1) % self.batch_size == 0 or index == len(self.data) - 1:
+                (batch_old_word_set_, old_mask), (batch_new_word_set_,new_mask) = set_padding(batch_old_word_set), set_padding(batch_new_word_set)
+                batch_attention_pos_, _ = set_padding(batch_attention_pos)
+                batch_label = np.array(batch_label)
+                # batch_label = self._trans_label(batch_label)
+                yield batch_old_word_set_, old_mask, batch_new_word_set_, new_mask, batch_label, batch_attention_pos_
+                batch_old_word_set, batch_new_word_set, batch_label, batch_attention_pos = [],[],[],[]
+ 
 
 def test_dataloader():
     # import os
