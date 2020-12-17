@@ -62,7 +62,7 @@ def test_clustertask(operateconfig:Dict,dataconfig:Dict, trainingconfig:Dict, mo
                 ) 
         dev_datasetitem = DataItemSet(
                     dataset=datasetdir.test_dataset,
-                    sampler = select_sampler(dataconfig['sample_strategy']),
+                    sampler = select_sampler(dataconfig['test_sample_strategy']),
                     negative_sample_size = dataconfig['test_negative_sample_size']
                 )
         train_dataloader = Dataloader(
@@ -99,7 +99,7 @@ def test_clustertask(operateconfig:Dict,dataconfig:Dict, trainingconfig:Dict, mo
     if operateconfig['test']:
         test_datasetitem = DataItemSet(
                     dataset=datasetdir.test_dataset,
-                    sampler = select_sampler(dataconfig['sample_strategy']),
+                    sampler = select_sampler(dataconfig['test_sample_strategy']),
                     negative_sample_size = dataconfig['test_negative_sample_size']
                 )
 
@@ -143,6 +143,7 @@ def Wiki():
 
 def CSKB():
     DataConfig['data_dir_path'] = config.CSKB_DIR_PATH
+    DataConfig['sample_strategy'] = 'sample_enumerate_size_enumerate'
     ModelConfig['attention_hidden_size'] = 768
     ModelConfig['classifier_hidden_size'] = [4096, 1024]
     ModelConfig['mapper_hidden_size'] = [1024, 4096]
