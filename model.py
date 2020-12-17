@@ -6,7 +6,7 @@
 '''
 
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Sequence,Any
 import torch
 import torch.nn as nn
 from torch.nn.modules import dropout
@@ -14,6 +14,7 @@ from transformers import BertModel
 from config import BertPretrainedModelPath
 import numpy as np
 import math
+from copy import deepcopy
 
 class Embedding_layer(nn.Module):
     """embedding layer and provide some method to freeze layer parameters"""
@@ -280,25 +281,109 @@ class BinarySynClassifierBaseOnAttention(nn.Module):
         return torch.load(str(path))
 
 
-"""Based On Transformer and Reading Comprehension"""
+
+
+"""  Based On Transformer and Reading Comprehension  """
+def create_layer_list(layer:nn.Module, n:int)->Sequence[Any]:
+    L = [layer]
+    for i in range(1,n):
+        L.append(deepcopy(layer))
+    return L
+
 class BinarySynClassifierBaseOnTransformer(nn.Module):
     """SynSet Based On Transformer"""
 
     def __init__(self,config:Dict):
-        super(BinarySynClassifierBaseOnAttention, self).__init__()
+        super(BinarySynClassifierBaseOnTransformer, self).__init__()
         self.name = config['name']
         self.embedding = config['embedding']
         self.version = config['version']
-        self.hidden_state = config['hidden_state']
-        self.mapper = nn.Linear(self.embedding.dim)
-        self.encoder = TransformerUnit(config['d_model'], dim_feedforward=config['dim_feedforward'])
-        self.decoder = TransformerUnit(config['d_model'], dim_feedforward=config['dim_feedforward'])
+        self.d_model= config['hidden_state_size']
+        self.mapper = nn.Linear(self.embedding.dim, self.d_model)
+        self.attention_mapper = nn.Linear(self.d_model, 1)
+        self.encoderLayernum = config['encoder_layer']
+        self.decoderLayernum = config['decoder_layer']
+        self.num_head = config['nhead']
+        self.encoderlayer = nn.ModuleList(create_layer_list(TransformerUnit(self.d_model,nhead=config['nhead'],dim_feedforward=config['dim_feedforward']), self.encoderLayernum))
         
+        self.decoderlayer = nn.ModuleList(create_layer_list(TransformerUnit(self.d_model, nhead=config['nhead'], dim_feedforward=config['dim_feedforward']), self.decoderLayernum))
         
+        self.classifier = getFCLayer([self.d_model, *config['classifier_hidden_size'], 1],True,dropout=config['dropout'])
+    
+
+    def forward(self,old_word_set, old_mask, new_word_set, new_mask):
+        # old_word_set  batch_size * seq_len * word_emb_size
+        # old_mask batch_size * seq_len
+        # new_word_set  batch_size * seq_len * word_emb_size
+        # new_mask batch_size * seq_len_value
+
+        #embedding
+        old_word_set = self.embedding(old_word_set)
+        new_word_set = self.embedding(new_word_set)
+
+        # trans
+        old_word_set = old_word_set.transpose(0,1)
+        new_word_set = new_word_set.transpose(0,1)
+        old_mask = old_mask == 0
+        new_mask = new_mask == 0
+        
+        mem = self.mapper(old_word_set)
+        mem = self._cal_encoder_layers(mem,key_padding_mask=old_mask)
+        tgt = self.mapper(new_word_set)
+
+        # generate attn_mask
+        query_mask = new_mask.unsqueeze(-1).expand(-1, -1, old_mask.shape[-1])
+        # batch_size * old_seq_len * new_seq_len
+        key_mask = old_mask.unsqueeze(1).expand(-1, new_mask.shape[-1], -1) 
+        # batch_size * old_seq_len * new_seq_len
+        attn_mask = query_mask * key_mask
+        attn_mask = torch.repeat_interleave(attn_mask,self.num_head, dim = 0)
+        # (batch_size * num_head) * old_seq_len * new_seq_len
+        tgt = self._cal_decoder_layers(tgt, mem, attn_mask=attn_mask, key_padding_mask= old_mask)
+        # new_seq_len * batch_size * d_model
+        tgt = tgt.transpose(0,1)
+        # batch_size * new_seq_len * d_model
+
+        tgt = torch.sum(tgt, dim = 1).squeeze(1)
+        # batch_size * d_model
+
+        tgt = self.classifier(tgt)
+        # batch_size * d_model
+        tgt = torch.sigmoid(tgt)
+
+        return tgt
+    
+    def cal_attention_weight(self, word_set, word_set_mask):
+        word_set_mask = word_set_mask == 0
+        # word_set batch_size * seq_len * word_emb
+        src = self.embedding(word_set)
+        src = src.transpose(0,1)
+        src = self.mapper(src)
+        src = self._cal_encoder_layers(src,key_padding_mask = word_set_mask)
+        # new_seq_len * batch_size * d_model
+
+        src = self.attention_mapper(src).squeeze(-1)
+        # batch_size * new_seq_len
+        src = src.transpose(0,1)
+        
+        return torch.sigmoid(src)
+        
+    def _cal_encoder_layers(self,tgt:torch.Tensor, attn_mask = None, key_padding_mask = None):    
+        for layer in self.encoderlayer:
+            tgt = layer(tgt, tgt, tgt, attn_mask=attn_mask, key_padding_mask = key_padding_mask)
+        return tgt
+    
+    def _cal_decoder_layers(self,tgt:torch.Tensor, mem:torch.Tensor, attn_mask = None, key_padding_mask = None):    
+        for layer in self.decoderlayer:
+            tgt = layer(tgt, mem, mem, attn_mask=attn_mask, key_padding_mask = key_padding_mask)
+        return tgt
+    
+
+
+
 class TransformerUnit(nn.Module):
     """Transformer Unit"""
-
-    def __init__(self, d_model:int, nhead:int, dim_feedforward:int = 2084, 
+    def __init__(self, d_model:int, nhead:int, dim_feedforward:int = 1024, 
         dropout:float = 0.2, activation:str = "relu"):
         super(TransformerUnit, self).__init__()
         self.attn = nn.MultiheadAttention(d_model, nhead, dropout=dropout)
@@ -316,10 +401,19 @@ class TransformerUnit(nn.Module):
     def forward(self,query: torch.Tensor, 
             key: torch.Tensor, 
             value: torch.Tensor, 
-            attn_mask: torch.Tensor):
-        src = value
+            attn_mask: torch.Tensor = None,
+            key_padding_mask: torch.Tensor = None
+            ):
+        
+        # attn_mask [batch*num_heads, seq_query, seq_key]
+        # query: (seq_query , batch, emb)
+        # key: (seq_key, batch, emb)
+        # value: (seq_key, batch, emb)
+        # key_padding_mask (batch, seq_key)
 
-        src2 = self.attn(query, key, value, attn_mask = attn_mask)[0]
+        src = query
+        #
+        src2 = self.attn(query, key, value,key_padding_mask = key_padding_mask, attn_mask = attn_mask)[0]
 
         src = src + self.dropout1(src2)
 
@@ -331,5 +425,6 @@ class TransformerUnit(nn.Module):
 
         src = self.norm2(src)
 
+        # seq_key, batch, d_model
         return src
         
