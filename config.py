@@ -63,7 +63,8 @@ DataConfig = {
     'sample_strategy' : 'sample_large_size_enumerate',
     'negative_sample_size' : 20,
     'test_negative_sample_size' : 10,
-    'word_emb_select': 'embed'
+    'word_emb_select': 'embed',
+    'test_sample_strategy': 'sample_large_size_enumerate'
 }
 
 #default modelconfig
