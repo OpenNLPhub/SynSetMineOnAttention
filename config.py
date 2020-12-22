@@ -43,7 +43,7 @@ TrainingConfig = {
     'print_step' : 15,
     'lr' : 1e-4,
     'checkpoint_dir' : CHECK_POINT_DIR_PATH,
-    'batch_size' : 32,
+    'batch_size' : 256,
     'result_out_dir' : RESULT_DIR_PATH,
     'cuda': 'cuda:0',
     'bert_freeze': False
@@ -60,7 +60,7 @@ OperateConfig = {
 #default dataconfig
 DataConfig = {
     'data_dir_path' : None,
-    'sample_strategy' : 'sample_large_size_enumerate',
+    'sample_strategy' : 'sample_enumerate_size_enumerate',
     'negative_sample_size' : 20,
     'test_negative_sample_size' : 10,
     'word_emb_select': 'embed',

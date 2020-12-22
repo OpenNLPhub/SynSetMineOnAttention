@@ -28,23 +28,7 @@ def set_padding(m:List[List[int]],padding = 0)-> Tuple[np.array,np.array]:
     
     return input_ids, mask
 
-def set_padding_len(m:List[List[int]],padding = 0):
-    len_list = []
-    max_len = 0
-    for i in m:
-        if max_len < len(i):
-            max_len = len(i)
-        len_list.append(len(i))
-    input_ids = np.array([
-        np.concatenate([ x , [padding]*(max_len - (len(x)))]) if len(x)< max_len else x for x in m
-    ])
-    mask = []
-    for i in len_list:
-        if i == max_len:
-            mask.append([1] * i)
-        else:
-            mask.append([ *([1] * i), *([0] * (max_len - 1))])
-    return input_ids, np.array(mask)
+
 
 def set_random_seed(seed = 10, deterministic = False, benchmark = False):
     """

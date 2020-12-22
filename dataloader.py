@@ -9,15 +9,19 @@
 
 from pathlib import Path
 import random
+import re
+from re import sub
 from typing import Dict, List, Optional, Set, Tuple, Any
 from copy import copy
 import numpy as np
-from utils import set_padding, set_padding_len
+from numpy.core.defchararray import index
+from torch.utils import data
+from utils import set_padding
 import pickle
 from base.basedataloader import BaseDataLoader
 from itertools import combinations
-from tqdm import tqdm
-pattern = "(?<=\')[^\|\']*\|\|[^\|\']*?(?=\')"
+
+
 
 
 class DataSetDir(object):
@@ -68,11 +72,10 @@ class DataSetDir(object):
         word2id['SEP'] = 3
         word2id['SPLIT'] = 4
         embed_matrix = [[0]*dim_size,[0]*dim_size,[0]*dim_size,[0]*dim_size,[0]*dim_size]
-        for idx,line in tqdm(enumerate(lines[1:])):
-            t = line.strip()
-            word, t = t.split('||')
-            t = t.split(' ')
-            word2id[word] = 2+idx
+        for idx,line in enumerate(lines[1:]):
+            t = line.strip().split(' ')
+            word, _ = t[0].split('||')
+            word2id[word] = 5+idx
             nums = [ eval(i) for i in t[1:]]
             embed_matrix.append(nums)
         
@@ -192,6 +195,52 @@ class Sample_size_repeat_size(DataItemSampler):
         return ans,subset_size, pos_item_nums, neg_item_nums
 
 
+class Smaple_large_size_enumerate(DataItemSampler):
+    """A sample method to sample dataitem: for oen original word set,
+       if size of this word set is more than 2, enunmerate subword size 2 to wordset -1
+       if size of this word set is less than 2, ignore this word set
+    """
+    def __init__(self) -> None:
+        super(Smaple_large_size_enumerate,self).__init__()
+    
+    def sample(self, wordpool:Dict, wordset: List[str], negative_sample_size:int) -> Tuple[List[Tuple],int]:
+        ans = []
+        setsize = len(wordset)
+
+        if setsize == 1:
+            pos_word = wordset[0]
+            neg_word = random.choice(list(wordpool.keys()))
+            while neg_word == pos_word:
+                neg_word = random.choice(list(wordpool.keys()))
+            ans = [
+                (pos_word, pos_word, 1),
+                (pos_word, neg_word, 0)
+            ]
+            return ans, 1.0, 1, 1
+        sub_word_set_range = range(2,setsize+1) if setsize > 2 else range(1,setsize)
+        pos_item_nums = 0
+        neg_item_nums = 0
+        ave_subset_size = 0.0
+        for subwordsetsize in sub_word_set_range:
+            word_index = random.sample(range(0,setsize), subwordsetsize)
+            subwordset = [wordset[ix] for ix in word_index]
+            
+            #pos_data item
+            waiting_word_set = [ word for word in wordset if word not in subwordset]
+            pos_word = random.choice(wordset) if len(waiting_word_set) == 0 else random.choice(waiting_word_set)
+            ans.append((subwordset, pos_word, 1))
+            neg_words = self._negative_sample(wordpool,wordset,negative_sample_size)
+            for neg_word in neg_words:
+                ans.append((subwordset, neg_word,0))
+            
+            pos_item_nums += 1
+            neg_item_nums += negative_sample_size
+            ave_subset_size += subwordsetsize
+            
+        return ans, ave_subset_size/(setsize - 1), pos_item_nums, neg_item_nums
+            
+
+
 class Sample_enumerate_size_enumerate(DataItemSampler):
     """A sample method to sample dataitem : For one original word set, enunmerate all subset size and get item
     """
@@ -231,54 +280,6 @@ class Sample_enumerate_size_enumerate(DataItemSampler):
                 neg_item_nums += negative_sample_size
                 ave_subset_size += subwordsetsize    
         return ans, ave_subset_size/(setsize - 1), pos_item_nums, neg_item_nums
-            
-class Smaple_large_size_enumerate(DataItemSampler):
-    """A sample method to sample dataitem: for oen original word set,
-       if size of this word set is more than 2, enunmerate subword size 2 to wordset -1
-       if size of this word set is less than 2, ignore this word set
-    """
-    def __init__(self) -> None:
-        super(Smaple_large_size_enumerate,self).__init__()
-
-    def sample(self, wordpool: Dict, wordset: List[str], negative_sample_size:int) -> Tuple[List[Tuple],int]:
-        """c"""
-        ans = []
-        setsize = len(wordset)
-
-        if setsize == 1:
-            pos_word = wordset[0]
-            neg_word = random.choice(list(wordpool.keys()))
-            while neg_word == pos_word:
-                neg_word = random.choice(list(wordpool.keys()))
-            ans = [
-                (pos_word, pos_word, 1),
-                (pos_word, neg_word, 0)
-            ]
-            return ans, 1.0, 1, 1
-        
-        sub_word_set_range = range(2,setsize+1) if setsize > 2 else range(1,setsize)
-        pos_item_nums = 0
-        neg_item_nums = 0
-        ave_subset_size = 0.0
-        for subwordsetsize in sub_word_set_range:
-            word_index = random.sample(range(0,setsize), subwordsetsize)
-            subwordset = [wordset[ix] for ix in word_index]
-            
-            #pos_data item
-            waiting_word_set = [ word for word in wordset if word not in subwordset]
-            pos_word = random.choice(wordset) if len(waiting_word_set) == 0 else random.choice(waiting_word_set)
-            ans.append((subwordset, pos_word, 1))
-            neg_words = self._negative_sample(wordpool,wordset,negative_sample_size)
-            for neg_word in neg_words:
-                ans.append((subwordset, neg_word,0))
-            
-            pos_item_nums += 1
-            neg_item_nums += negative_sample_size
-            ave_subset_size += subwordsetsize
-            
-        return ans, ave_subset_size/(setsize - 1), pos_item_nums, neg_item_nums
-            
-
 
 
 
@@ -291,7 +292,6 @@ def select_sampler(name:str)-> DataItemSampler:
         return Smaple_large_size_enumerate()
     else:
         raise KeyError
-
 
 class DataItemSet(object):
     """DataItemSet  Generate Training and Testing data item"""
@@ -319,7 +319,7 @@ class DataItemSet(object):
         neg_item_num = 0
         pos_item_num = 0
 
-        for wordset in tqdm(dataset):
+        for wordset in dataset:
             subitems, subset_size, pos_item_size, neg_item_size = self.sampler.sample(self.vocab,wordset,self.negative_sample_size)
 
             neg_item_num += neg_item_size
@@ -379,7 +379,7 @@ class Dataloader(BaseDataLoader):
     def __iter__(self):
         ixs = list(range(0,len(self.data)))
         random.shuffle(ixs)
-        batch_word_set, batch_waiting_word, batch_label = [], [], []
+        batch_word_set, batch_waiting_word, batch_label, = [], [], []
         for index,ix in enumerate(ixs):
             word_set, waiting_word, label = self.data[ix]
             word_id_set = [ self.word2id[word] for word in word_set]
@@ -394,49 +394,6 @@ class Dataloader(BaseDataLoader):
                 batch_word_set, batch_waiting_word, batch_label, = [], [], []
 
 
-class DataloaderTransformer(object):
-    """Dataloader to get batch size dataitem"""
-    def __init__(self, dataitems:DataItemSet, word2id, batch_size:int) -> None:
-        self.data = dataitems
-        self.l = len(self.data)//batch_size if len(self.data)%batch_size == 0 else len(self.data)//batch_size + 1
-        self.batch_size = batch_size
-        self.word2id = word2id
-
-    def __len__(self):
-        return self.l
-
-    def __iter__(self):
-        ixs = list(range(0,len(self.data)))
-        random.shuffle(ixs)
-        batch_old_word_set, batch_new_word_set, batch_label, batch_attention_pos = [], [], [], []
-        # import pdb;pdb.set_trace()
-        for index,ix in enumerate(ixs):
-            word_set, waiting_word, label = self.data[ix] 
-            word_id_set = [ self.word2id[word] for word in word_set]
-            waiting_word_id = self.word2id[waiting_word]
-            new_word_id_set = word_id_set.copy()
-            new_word_id_set.append(waiting_word_id)
-            
-            batch_old_word_set.append(word_id_set)
-            batch_new_word_set.append(new_word_id_set)
-            batch_label.append(label)
-            if label == 1:
-                attention_pos = [0] * len(word_id_set)
-                attention_pos.append(1)
-            else:
-                attention_pos = [0] * len(new_word_id_set)
-            
-            batch_attention_pos.append(attention_pos)
-            
-            if (index+1) % self.batch_size == 0 or index == len(self.data) - 1:
-                (batch_old_word_set_, old_mask), (batch_new_word_set_,new_mask) = set_padding(batch_old_word_set), set_padding(batch_new_word_set)
-                batch_attention_pos_, _ = set_padding(batch_attention_pos)
-                batch_label = np.array(batch_label)
-                # batch_label = self._trans_label(batch_label)
-                yield batch_old_word_set_, old_mask, batch_new_word_set_, new_mask, batch_label, batch_attention_pos_
-                batch_old_word_set, batch_new_word_set, batch_label, batch_attention_pos = [],[],[],[]
- 
-
 def test_dataloader():
     # import os
     # cwd = os.getcwd()
@@ -444,7 +401,7 @@ def test_dataloader():
     cwd = Path.cwd()
     NYT = cwd.joinpath('data','NYT')
     datasetdir = DataSetDir(NYT)
-    sampler = select_sampler('sample_enumerate_size_enumerate')
+    sampler = select_sampler('sample_large_size_enumerate')
     dataitemset = DataItemSet(datasetdir.train_dataset,sampler,5)
     print(dataitemset)
     
@@ -459,6 +416,7 @@ def test_dataloader():
     for ix,i in enumerate(dataitemset):
         print(i)
     
+
 if __name__ == '__main__':
     test_dataloader()
 
