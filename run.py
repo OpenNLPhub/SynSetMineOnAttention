@@ -141,28 +141,6 @@ def Wiki():
     DataConfig['data_dir_path'] = config.Wiki_DIR_PATH
     test_clustertask(OperateConfig,DataConfig,TrainingConfig,ModelConfig)
 
-def CSKB():
-    DataConfig['data_dir_path'] = config.CSKB_DIR_PATH
-    DataConfig['sample_strategy'] = 'sample_enumerate_size_enumerate'
-    ModelConfig['attention_hidden_size'] = 768
-    ModelConfig['classifier_hidden_size'] = [4096, 1024]
-    ModelConfig['mapper_hidden_size'] = [1024, 4096]
-    ModelConfig['dropout'] = 0.3
-    TrainingConfig['epoches'] = 500
-    TrainingConfig['lr'] = 1e-5
-    test_clustertask(OperateConfig, DataConfig, TrainingConfig, ModelConfig)
-
-
-def OMaha():
-    DataConfig['data_dir_path'] = config.OMaha_DIR_PATH
-    DataConfig['sample_strategy'] = 'sample_size_repeat_size'
-    ModelConfig['attention_hidden_size'] = 768
-    ModelConfig['classifier_hidden_size'] = [2048, 512]
-    ModelConfig['mapper_hidden_size'] = [1024, 2048]
-    ModelConfig['dropout'] = 0.3
-    TrainingConfig['epoches'] = 200
-    TrainingConfig['lr'] = 1e-5
-    test_clustertask(OperateConfig, DataConfig, TrainingConfig, ModelConfig)
 
 def run():
     set_random_seed(seed=SEED)
@@ -172,10 +150,6 @@ def run():
         PubMed()
     elif args.dataset == 'Wiki':
         Wiki()
-    elif args.dataset == 'CSKB':
-        CSKB()
-    elif args.dataset == 'OMaha':
-        OMaha()
     else:
         raise KeyError
 
